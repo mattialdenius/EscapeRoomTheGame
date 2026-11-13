@@ -43,6 +43,65 @@ K5.welt = {
     torFalsch:        ["Das Tor bleibt zu. Schaut auf die Lämpchen: Grün stimmt, Rot noch nicht!"],
     zwilling:         ["Hier ist eine ähnliche Aufgabe. Ihr schafft das!"],
     torBereit:        ["Alle Gehege sind geschafft! Stellt den Code am Zootor ein."]
+  },
+
+  // -------------------------------------------------------------------
+  // ZOO-KARTE (Entdecker-Modus)  ·  gehört zur Datei welt/karte.js
+  // Die Karte ersetzt die Übersicht mit den Kacheln. Die Kinder tippen
+  // auf die Karte und die Spielfigur läuft hin.
+  //
+  // So lest ihr die Zahlen:
+  //   x = wie weit nach rechts (0 = ganz links, 1600 = ganz rechts)
+  //   y = wie weit nach unten  (0 = ganz oben,  1000 = ganz unten)
+  // Größere Zahl bei x: weiter rechts. Größere Zahl bei y: weiter unten.
+  // Bitte kleine Schritte (z. B. 50) ändern und danach im Browser ansehen.
+  // Häuser brauchen Platz: etwa 300 breit und 200 hoch. Der Punkt x/y
+  // liegt in der Mitte des Hauses, die Tür ist unten in der Mitte.
+  // -------------------------------------------------------------------
+  karte: {
+    groesse: { b: 1600, h: 1000 },          // Größe der ganzen Karte. Klein lassen: kurze Wege!
+    start:   { x: 800, y: 860 },            // hier steht die Spielfigur am Anfang (vor dem Zootor)
+
+    // Die vier Gehege. Reihenfolge = Reihenfolge der Räume oben (Affenhaus zuerst).
+    // „schild“ ist der Text auf dem Schild über dem Haus.
+    gehege: [
+      { x: 300,  y: 300, schild: "Affenhaus" },
+      { x: 1300, y: 300, schild: "Pinguinbecken" },
+      { x: 300,  y: 700, schild: "Reptilienhaus" },
+      { x: 1300, y: 700, schild: "Elefantenhaus" }
+    ],
+
+    raubtierhaus: { x: 800, y: 200, schild: "Raubtierhaus" },   // nur Kulisse mit schlafendem Löwen
+    tor:          { x: 800, y: 950 },                           // das Zootor unten in der Mauer
+    brunnen:      { x: 800, y: 600 },                           // Brunnen in der Mitte (Schmuck)
+
+    // Figuren auf der Karte: höchstens 5. Keine hält auf, Antippen ist freiwillig.
+    //   art: "polly"      = fliegt der Spielfigur hinterher (braucht keinen Ort)
+    //   art: "waerterin"  = zeigt beim Antippen die Regelkarte des nächsten Geheges
+    //   art: "waechter"   = dreht langsam seine „runde“ (Liste von Punkten [x, y]) und warnt, wenn die Zeit knapp wird
+    //   art: "tier"       = zeigt beim Antippen ein Wort aus der Wörterhilfe („emoji“ = Bild, „name“ = für Vorleseprogramme)
+    figuren: [
+      { art: "polly" },
+      { art: "waerterin", name: "Zoowärterin",  x: 690,  y: 500 },
+      { art: "waechter",  name: "Nachtwächter", runde: [[900, 480], [1120, 480], [1120, 700], [900, 700]] },
+      { art: "tier", emoji: "🦉", name: "Eule", x: 540,  y: 715 },
+      { art: "tier", emoji: "🦔", name: "Igel", x: 1080, y: 880 }
+    ],
+
+    // Texte der Karte. {name} wird automatisch durch den Namen des Geheges ersetzt.
+    texte: {
+      gesperrt:        "Dieses Gehege ist noch zu. Schafft zuerst das Gehege mit dem Pfeil!",
+      schonGeschafft:  "Hier habt ihr die Ziffer schon gefunden. Weiter geht's!",
+      torZu:           "Erst alle vier Gehege schaffen!",
+      loewe:           "Psst! Der Löwe schläft. Er wacht erst auf, wenn ihr ein Gehege geschafft habt.",
+      jubel:           "Kraaah! Eine neue Ziffer!",
+      tipp:            "Als Nächstes: {name}! Folgt dem gelben Pfeil.",
+      tippTor:         "Alle Ziffern gefunden! Lauft zum Zootor.",
+      regelTitel:      "Regel für: {name}",
+      keineRegel:      "Für dieses Gehege gibt es keine Regelkarte.",
+      waerterinFertig: "Alles geschafft! Jetzt schnell zum Zootor.",
+      waechter:        "Beeilt euch!"
+    }
   }
 };
 
