@@ -16,6 +16,7 @@ const EINSTELLUNGEN = {
   zusatzraumSekunden: { gruen: 30, gelb: 25, rot: 20 },  // Zeit für die Bonusfrage
   zusatzraumFalscheAntwortBeendet: true,                 // true = eine falsche Antwort beendet den Zusatzraum sofort
   torVersuche: 3,                                        // so viele Versuche hat man am Zahlenschloss des Ausgangs
+  wiederholungThemenProRaum: 5,                          // „Wiederholung“: höchstens so viele Themen pro Raum (4 Räume × 5 = bis zu 20 Themen). 1 = wie früher
   internationalismenAktiv: true,                         // true = auch erschließbare Wörter (banana, hotel …) aus den „…Extra“-Listen
   woerterhilfeAktiv: true,                               // true = Wörter aus der WOERTERHILFE sind unterstrichen, Antippen zeigt Deutsch
   // Welche Rätselformen gehören zu welchem Niveau?

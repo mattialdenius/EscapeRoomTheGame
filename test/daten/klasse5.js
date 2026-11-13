@@ -79,13 +79,27 @@ K5.welt = {
     //   art: "polly"      = fliegt der Spielfigur hinterher (braucht keinen Ort)
     //   art: "waerterin"  = zeigt beim Antippen die Regelkarte des nächsten Geheges
     //   art: "waechter"   = dreht langsam seine „runde“ (Liste von Punkten [x, y]) und warnt, wenn die Zeit knapp wird
-    //   art: "tier"       = zeigt beim Antippen ein Wort aus der Wörterhilfe („emoji“ = Bild, „name“ = für Vorleseprogramme)
+    //   art: "tier"       = zeigt beim Antippen ein Wort aus der Wörterhilfe („emoji“ = Bild, „name“ = für Vorleseprogramme).
+    //                       Das Wort wandert in den Wörter-Rucksack. „trick“ = was das Tier dabei macht:
+    //                       "drehen" (wackelt mit dem Kopf), "rollen" (rollt einmal herum) oder "huepfen".
     figuren: [
       { art: "polly" },
       { art: "waerterin", name: "Zoowärterin",  x: 690,  y: 500 },
       { art: "waechter",  name: "Nachtwächter", runde: [[900, 480], [1120, 480], [1120, 700], [900, 700]] },
-      { art: "tier", emoji: "🦉", name: "Eule", x: 540,  y: 715 },
-      { art: "tier", emoji: "🦔", name: "Igel", x: 1080, y: 880 }
+      { art: "tier", emoji: "🦉", name: "Eule", trick: "drehen", x: 540,  y: 715 },
+      { art: "tier", emoji: "🦔", name: "Igel", trick: "rollen", x: 1080, y: 880 }
+    ],
+
+    // Wörter-Rucksack: So viele Wörter kann man bei den Tieren sammeln (0 = kein Rucksack).
+    // Der Rucksack ist nur Sammelspaß. Er zählt nicht für den Code und wird nicht gespeichert.
+    rucksack: { ziel: 10 },
+
+    // Orte, an denen Polly einmal pro Mission etwas sagt, wenn die Spielfigur in die Nähe kommt.
+    // radius = wie nah man sein muss. Neue Zeile kopieren, Zahlen und Text ändern.
+    orte: [
+      { x: 800, y: 600, radius: 150, text: "Schaut mal, der Mond schwimmt im Brunnen!" },
+      { x: 800, y: 300, radius: 130, text: "Psst, ganz leise am Raubtierhaus!" },
+      { x: 150, y: 520, radius: 120, text: "Huch, ist das dunkel hier hinten!" }
     ],
 
     // Texte der Karte. {name} wird automatisch durch den Namen des Geheges ersetzt.
@@ -100,7 +114,17 @@ K5.welt = {
       regelTitel:      "Regel für: {name}",
       keineRegel:      "Für dieses Gehege gibt es keine Regelkarte.",
       waerterinFertig: "Alles geschafft! Jetzt schnell zum Zootor.",
-      waechter:        "Beeilt euch!"
+      waechter:        "Beeilt euch!",
+
+      // Steht hier eine Liste [ "…", "…" ], wird jedes Mal ein Satz ausgewählt.
+      waechterRuf:     ["Wer ist da?", "Halt! … Ach, ihr seid es.", "Nanu? Schon so spät!"],   // wenn sein Licht die Spielfigur trifft
+      loeweSchnarcht:  ["Chrrr … chrrr …", "Chrrr … *blinzel* … chrrr", "Grrr-mpf … zzz"],     // nacheinander, wenn man den Löwen antippt
+      pollyGeschafft:  ["Kraaah! Die erste Ziffer!", "Halbzeit! Zwei Ziffern!", "Nur noch ein Gehege!", "Alle vier! Auf zum Zootor!"],   // nach dem 1., 2., 3., 4. Gehege
+      pollyWarten:     ["Kommt, weiter geht's: {name}!", "Wo bleibt ihr? Ich fliege schon mal vor!"],   // wenn 20 Sekunden nichts passiert
+      pollyZurueck:    ["Nicht aufgeben! Gleich noch einmal.", "Kurze Pause? Dann wieder rein!"],         // wenn man ein Gehege verlässt, ohne es zu schaffen
+      rucksackTitel:   "Mein Wörter-Rucksack",
+      rucksackLeer:    "Noch leer. Tippt die Tiere am Weg an: Sie verraten euch englische Wörter!",
+      rucksackVoll:    "Kraaah! Der Wörter-Rucksack ist voll. Ihr seid echte Wort-Sammler!"
     }
   }
 };

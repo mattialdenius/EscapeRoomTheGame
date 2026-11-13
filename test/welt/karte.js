@@ -6,7 +6,7 @@
              hin, und am Gehege öffnet sich der gewohnte Aufgabenraum.
              Die Karte zeichnet und steuert nur. Aufgaben, Zeit, Ziffern
              und Zahlenschloss bleiben in index.html (über EscapeAPI).
-   Version:  karte 0.1  (passt zu App-Version 0.5.4, Testbereich)
+   Version:  karte 0.2  (passt zu App-Version 0.5.5, Testbereich)
    Daten:    Positionen und Texte stehen in daten/klasse5.js unter
              K5.welt.karte. Hier im Code steht nichts Festes davon.
    Speichert nichts: kein localStorage, keine Cookies, kein Netzwerk,
@@ -14,6 +14,13 @@
              Nach dem Neuladen der Seite ist alles wieder am Anfang.
 
    Änderungsliste:
+     0.2  (13.11.2026)  Nach dem ersten Klassentest: lebendigere Figuren.
+          Wörter-Rucksack (Tiere am Weg sammeln Wörter, Tiere machen
+          einen Trick), Nachtwächter ruft „Wer ist da?“, wenn sein Licht
+          die Spielfigur trifft (er fängt niemanden), Polly kommentiert
+          (Orte, Warten, Rückkehr aus einem Gehege, jedes geschaffte
+          Gehege), der Löwe reagiert aufs Antippen. Pfeil am Bildrand
+          ist antippbar. Der Rucksack wird nicht gespeichert.
      0.1  (13.11.2026)  Erste Fassung: Zoo bei Nacht, vier Gehege,
           Raubtierhaus (Kulisse), Zootor mit Code-Tafel, Polly,
           Zoowärterin (Regelkarte), Nachtwächter (Zeitwarnung),
@@ -37,7 +44,7 @@ const API = window.EscapeAPI;
 if (!API || typeof API.karteAnmelden !== 'function') { if (window.console) console.warn('Zoo-Karte: EscapeAPI fehlt – es bleibt bei der klassischen Übersicht.'); return; }
 
 /* ============ 1. HILFEN UND ZUSTAND ============ */
-const VERSION = '0.1';
+const VERSION = '0.2';
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -64,8 +71,17 @@ const TEXTE = {
   regelTitel: 'Regel für: {name}',
   keineRegel: 'Für dieses Gehege gibt es keine Regelkarte.',
   waerterinFertig: 'Alles geschafft! Jetzt schnell zum Zootor.',
-  waechter: 'Beeilt euch!'
+  waechter: 'Beeilt euch!',
+  waechterRuf: ['Wer ist da?', 'Halt! … Ach, ihr seid es.', 'Nanu? Schon so spät!'],
+  loeweSchnarcht: ['Chrrr … chrrr …', 'Chrrr … *blinzel* … chrrr', 'Grrr-mpf … zzz'],
+  pollyGeschafft: ['Kraaah! Die erste Ziffer!', 'Halbzeit! Zwei Ziffern!', 'Nur noch ein Gehege!', 'Alle vier! Auf zum Zootor!'],
+  pollyWarten: ['Kommt, weiter geht’s: {name}!', 'Wo bleibt ihr? Ich fliege schon mal vor!'],
+  pollyZurueck: ['Nicht aufgeben! Gleich noch einmal.', 'Kurze Pause? Dann wieder rein!'],
+  rucksackTitel: 'Mein Wörter-Rucksack',
+  rucksackLeer: 'Noch leer. Tippt die Tiere am Weg an: Sie verraten euch englische Wörter!',
+  rucksackVoll: 'Kraaah! Der Wörter-Rucksack ist voll. Ihr seid echte Wort-Sammler!'
 };
+const wahl = t => Array.isArray(t) ? (t.length ? t[Math.floor(Math.random() * t.length)] : '') : String(t || '');
 
 // Alles, was sich ändert, steht in Z (Zustand). Es wird nichts davon gespeichert.
 const Z = {
@@ -74,7 +90,7 @@ const Z = {
   status: null, sig: '', pollT: 0, neueMission: true, gewarnt: false, jubel: -1,
   P: null, polly: null, figs: [], G: [], raub: null, tor: null, brunnen: null, tafel: null,
   baeume: [], lampen: [], wege: [], flecken: [], sterne: [],
-  blasen: [], fx: [], marker: null, randPfeil: null, fokus: null, zeiger: null, tasten: new Set(), ruhig: false
+  blasen: [], fx: [], marker: null, randPfeil: null, woerter: [], fluege: [], orte: [], rucksackZiel: 10, rucksackWig: 0, ruhe: 0, sagBald: null, loeweNr: 0, fokus: null, zeiger: null, tasten: new Set(), ruhig: false
 };
 let box = null, canvas = null, ctx = null, srListe = null, srLive = null, regelBox = null, angemeldet = false;
 
@@ -97,6 +113,8 @@ const Sfx = {
     if (name === 'tipp') this.ton(660, 0.07);
     else if (name === 'zu') { this.ton(300, 0.14, { type: 'sine' }); this.ton(240, 0.2, { type: 'sine', at: 0.12 }); }
     else if (name === 'plopp') this.ton(420, 0.12, { to: 840, type: 'sine' });
+    else if (name === 'huch') { this.ton(520, 0.09, { type: 'square', vol: 0.06 }); this.ton(780, 0.14, { type: 'square', vol: 0.06, at: 0.1 }); }
+    else if (name === 'schnarch') { this.ton(110, 0.5, { to: 70, type: 'sawtooth', vol: 0.08 }); this.ton(180, 0.3, { to: 240, type: 'sine', vol: 0.05, at: 0.55 }); }
     else if (name === 'jubel') [523, 659, 784, 1047].forEach((f, i) => this.ton(f, 0.18, { at: i * 0.09 }));
   }
 };
@@ -135,7 +153,7 @@ function baue(welt) {
   Z.tor = { x: tx, y: ty, name: welt.ausgang.name, emoji: welt.ausgang.emoji, spot: { x: tx, y: ty - 48 }, wackel: 0 };
   Z.tafel = { x: tx + 160, y: ty - 62 };
   const rb = D.raubtierhaus || {}, rx = zahl(rb.x, W / 2), ry = zahl(rb.y, 200);
-  Z.raub = { x: rx, y: ry, name: rb.schild || welt.zusatzraum.name, emoji: welt.zusatzraum.emoji, rect: { x0: rx - 150, y0: ry - 110, x1: rx + 150, y1: ry + 40 }, spot: { x: rx, y: ry + 74 } };
+  Z.raub = { x: rx, y: ry, name: rb.schild || welt.zusatzraum.name, emoji: welt.zusatzraum.emoji, rect: { x0: rx - 150, y0: ry - 110, x1: rx + 150, y1: ry + 40 }, spot: { x: rx, y: ry + 74 }, wach: 0, wackel: 0 };
   const br = D.brunnen || {};
   Z.brunnen = { x: zahl(br.x, W / 2), y: zahl(br.y, H * 0.6), rx: 78, ry: 54 };
   Z.start = { x: zahl(D.start && D.start.x, tx), y: zahl(D.start && D.start.y, ty - 90) };
@@ -151,11 +169,13 @@ function baue(welt) {
     if (f.art === 'polly') { hatPolly = true; return; }
     if (f.art === 'waechter') {
       const runde = (Array.isArray(f.runde) ? f.runde : []).filter(p => Array.isArray(p) && p.length >= 2).map(p => ({ x: +p[0], y: +p[1] }));
-      if (runde.length) Z.figs.push({ id: 'waechter', art: 'waechter', name: f.name || 'Nachtwächter', runde, x: runde[0].x, y: runde[0].y, ziel: 1 % runde.length, blick: 1, winkel: 0, hop: 0 });
+      if (runde.length) Z.figs.push({ id: 'waechter', art: 'waechter', name: f.name || 'Nachtwächter', runde, x: runde[0].x, y: runde[0].y, ziel: 1 % runde.length, blick: 1, winkel: 0, kegel: 0, pause: 0, ruhe: 3, hop: 0 });
     } else if (f.art === 'waerterin') Z.figs.push({ id: 'waerterin', art: 'waerterin', name: f.name || 'Zoowärterin', x: zahl(f.x, tx - 110), y: zahl(f.y, H / 2), hop: 0 });
-    else if (f.art === 'tier') Z.figs.push({ id: 'tier' + i, art: 'tier', name: f.name || 'Tier', emoji: f.emoji || '🦉', x: zahl(f.x, 200 + i * 200), y: zahl(f.y, H / 2), hop: 0 });
+    else if (f.art === 'tier') Z.figs.push({ id: 'tier' + i, art: 'tier', name: f.name || 'Tier', emoji: f.emoji || '🦉', trick: f.trick || 'huepfen', trickT: 0, x: zahl(f.x, 200 + i * 200), y: zahl(f.y, H / 2), hop: 0 });
   });
   Z.hatPolly = hatPolly || !Array.isArray(D.figuren);
+  Z.rucksackZiel = clamp(Math.round(zahl(D.rucksack && D.rucksack.ziel, 10)), 0, 30);   // 0 = kein Rucksack
+  Z.orte = (Array.isArray(D.orte) ? D.orte : []).filter(o => o && o.text).map(o => ({ x: zahl(o.x, 0), y: zahl(o.y, 0), r: zahl(o.radius, 120), text: o.text, gesagt: false }));
 
   // Laternen
   Z.lampen = [];
@@ -332,15 +352,15 @@ function zeichneGehege(c, g, t) {
   else { c.fillStyle = '#000'; circ(c, x + 16, y + 6, 4); c.fill(); }
 }
 function zeichneRaub(c, r, t) {
-  const x = r.x, y = r.y;
+  const wach = r.wach > 0, x = r.x + (r.wackel > 0 && !Z.ruhig ? Math.sin(r.wackel * 40) * 4 * r.wackel : 0), y = r.y;
   c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, x, y + 40, 160, 18); c.fill();
   rr(c, x - 150, y - 110, 300, 150, 16); fs(c, '#5b3140', '#000', 4);
   rr(c, x - 160, y - 124, 320, 36, 14); fs(c, '#1b2646', '#000', 4);
   rr(c, x - 110, y - 70, 220, 92, 12); fs(c, '#161f3c', '#000', 4);
-  emoji(c, r.emoji, x - 10, y - 20, 62);
+  emoji(c, r.emoji, x - 10, y - 20, wach && !Z.ruhig ? 62 + Math.sin(r.wach * 9) * 7 : 62);
   c.strokeStyle = '#9aa6c8'; c.lineWidth = 5; for (let i = -88; i <= 88; i += 22) { c.beginPath(); c.moveTo(x + i, y - 68); c.lineTo(x + i, y + 20); c.stroke(); }
   c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  for (let i = 0; i < 3; i++) { const u = Z.ruhig ? 0.5 : (t * 0.4 + i / 3) % 1; c.globalAlpha = 1 - u * 0.8; c.font = 'bold ' + (16 + i * 5) + 'px ' + TEXT_FONT; c.fillText('z', x + 44 + i * 20, y - 30 - i * 16 - u * 10); } c.globalAlpha = 1;
+  for (let i = 0; i < 3; i++) { const u = Z.ruhig ? 0.5 : (t * (r.wach > 0 ? 1.3 : 0.4) + i / 3) % 1; c.globalAlpha = 1 - u * 0.8; c.font = 'bold ' + (16 + i * 5) * (wach ? 1.5 : 1) + 'px ' + TEXT_FONT; c.fillText(wach ? 'Z' : 'z', x + 44 + i * 20, y - 30 - i * 16 - u * 10); } c.globalAlpha = 1;
 }
 function zeichneBrunnen(c, b, t) {
   c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, b.x, b.y + 10, b.rx + 8, b.ry + 6); c.fill();
@@ -463,14 +483,15 @@ function zeichne(c, t) {
   for (const f of Z.figs) add(f.y, () => {
     if (f.art === 'waerterin') zeichnePerson(c, f.x, f.y, t, { jacke: '#2e7d5b', hose: '#3a4a7a', haut: '#e8b98f', hut: 'hut', brett: true, blick: P.x < f.x ? -1 : 1, hop: f.hop, groesse: 1.08 });
     else if (f.art === 'waechter') {
-      c.save(); c.globalCompositeOperation = 'lighter'; c.translate(f.x, f.y - 10); c.rotate(f.winkel + (Z.ruhig ? 0 : Math.sin(t * 0.9) * 0.3));
+      c.save(); c.globalCompositeOperation = 'lighter'; c.translate(f.x, f.y - 10); c.rotate(f.kegel);
       const g = c.createRadialGradient(0, 0, 8, 0, 0, 170); g.addColorStop(0, 'rgba(190,220,255,0.30)'); g.addColorStop(1, 'rgba(190,220,255,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 170, -0.36, 0.36); c.closePath(); c.fill(); c.restore();
       zeichnePerson(c, f.x, f.y, t, { jacke: '#26345e', hose: '#1b2646', haut: '#c98f62', hut: 'kappe', lampe: true, streifen: '#ffd23f', blick: f.blick, gehen: f.geht, hop: f.hop, groesse: 1.12 });
     } else {
       const lift = f.hop > 0 ? Math.sin((1 - clamp(f.hop, 0, 1)) * Math.PI) * 14 : 0;
       c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, f.x, f.y, 20, 7); c.fill();
       rr(c, f.x - 16, f.y - 12, 32, 12, 4); fs(c, '#5a4636', '#000', 2.5);
-      emoji(c, f.emoji, f.x, f.y - 34 - lift, 42);
+      const u = clamp(f.trickT, 0, 1), dreh = Z.ruhig || u <= 0 ? 0 : f.trick === 'rollen' ? (1 - u) * TAU : f.trick === 'drehen' ? Math.sin(u * Math.PI * 3) * 0.55 : 0;
+      c.save(); c.translate(f.x + (f.trick === 'rollen' && !Z.ruhig ? Math.sin(u * Math.PI) * 26 : 0), f.y - 34 - lift); c.rotate(dreh); emoji(c, f.emoji, 0, 0, 42); c.restore();
     }
   });
   add(P.y + 0.1, () => zeichnePerson(c, P.x, P.y, t, { jacke: '#ffd23f', hose: '#2b59c3', haut: '#dba77c', hut: 'muetze', rucksack: true, lampe: true, blick: P.blick, gehen: P.geht, hop: P.hop }));
@@ -501,7 +522,24 @@ function zeichne(c, t) {
       c.rotate(a); tri(c, 30, -11, 46, 0, 30, 11); fs(c, '#ffd23f', '#000', 3); c.restore();
     }
   }
+  zeichneRucksack(c, t);
   for (const b of Z.blasen) zeichneBlase(c, b);
+}
+function rucksackOrt() { return { x: 10, y: Z.h - 60, w: 104, h: 50 }; }   // unten links, dort steht nur die Mauer
+function zeichneRucksack(c, t) {
+  if (!Z.rucksackZiel) return;
+  const R = rucksackOrt(), voll = Z.woerter.length >= Z.rucksackZiel, wig = Z.rucksackWig > 0 && !Z.ruhig ? Math.sin(Z.rucksackWig * 24) * 0.12 * Z.rucksackWig : 0;
+  c.save(); c.translate(R.x + R.w / 2, R.y + R.h / 2); c.rotate(wig);
+  rr(c, -R.w / 2, -R.h / 2, R.w, R.h, 14); fs(c, '#0b1736', '#000', 4); rr(c, -R.w / 2 + 4, -R.h / 2 + 4, R.w - 8, R.h - 8, 10); c.strokeStyle = '#ffd23f'; c.lineWidth = 2; if (!voll) c.setLineDash([6, 5]); c.stroke(); c.setLineDash([]);
+  emoji(c, '🎒', -R.w / 2 + 26, 1, 24);
+  c.fillStyle = '#fff'; c.font = 'bold 18px ' + MONO_FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(Math.min(Z.woerter.length, Z.rucksackZiel) + '/' + Z.rucksackZiel, 20, 1);
+  if (voll) symbol(c, 'haken', R.w / 2 - 6, -R.h / 2 + 6, 9);
+  c.restore();
+  for (const f of Z.fluege) {
+    const u = clamp(f.t / 0.8, 0, 1), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2, sx = (f.x - Z.cam.x) * Z.scale, sy = (f.y - Z.cam.y) * Z.scale;
+    const x = lerp(sx, R.x + R.w / 2, e), y = lerp(sy, R.y + R.h / 2, e) - Math.sin(e * Math.PI) * 50;
+    sternForm(c, x, y, 13); fs(c, '#ffd23f', '#000', 2.5);
+  }
 }
 function zeichneBlase(c, b) {
   const px = 17, maxW = Math.min(280, Z.w - 24); c.font = 'bold ' + px + 'px ' + TEXT_FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -525,7 +563,8 @@ function neuStart() {
   if (!frei(Z.P.x, Z.P.y)) { const k = naheFrei(Z.P.x, Z.P.y); if (k >= 0) { Z.P.x = (k % Z.cols + 0.5) * ZELLE; Z.P.y = (Math.floor(k / Z.cols) + 0.5) * ZELLE; } }
   Z.polly = { x: Z.P.x - 50, y: Z.P.y - 110, blick: 1 };
   Z.blasen = []; Z.fx = []; Z.marker = null; Z.gewarnt = false; Z.jubel = -1; Z.neueMission = false;
-  for (const f of Z.figs) if (f.runde) { f.x = f.runde[0].x; f.y = f.runde[0].y; f.ziel = 1 % f.runde.length; }
+  Z.woerter = []; Z.fluege = []; Z.ruhe = 0; Z.sagBald = null; Z.loeweNr = 0; Z.rucksackVoll = false; Z.sig = ''; for (const o of Z.orte) o.gesagt = false;
+  for (const f of Z.figs) if (f.runde) { f.x = f.runde[0].x; f.y = f.runde[0].y; f.ziel = 1 % f.runde.length; f.pause = 0; f.ruhe = 3; }
   kameraZu(1);
 }
 function kameraZu(k) {
@@ -545,8 +584,9 @@ function laufZu(x, y, ankunft) {
 // Alles, was man antippen kann: Standplatz davor, Rahmen (für Tastatur-Fokus) und was dort passiert
 function zielVon(id) {
   if (id[0] === 'g') { const g = Z.G[+id.slice(1)]; return g ? { spot: g.spot, schau: g, rahmen: { x0: g.rect.x0 - 14, y0: g.rect.y0 - 20, x1: g.rect.x1 + 14, y1: g.spot.y + 16 }, tun: () => amGehege(g.nr) } : null; }
+  if (id === 'rucksack') return null;
   if (id === 'tor') return { spot: Z.tor.spot, schau: Z.tor, rahmen: { x0: Z.tor.x - 100, y0: Z.tor.y - 100, x1: Z.tafel.x + 80, y1: Z.tor.y + 30 }, tun: amTor };
-  if (id === 'raub') return { spot: Z.raub.spot, schau: Z.raub, rahmen: { x0: Z.raub.rect.x0 - 14, y0: Z.raub.rect.y0 - 20, x1: Z.raub.rect.x1 + 14, y1: Z.raub.spot.y + 16 }, tun: () => sage(Z.texte.loewe) };
+  if (id === 'raub') return { spot: Z.raub.spot, schau: Z.raub, rahmen: { x0: Z.raub.rect.x0 - 14, y0: Z.raub.rect.y0 - 20, x1: Z.raub.rect.x1 + 14, y1: Z.raub.spot.y + 16 }, tun: amLoewe };
   const f = Z.figs.find(q => q.id === id); if (!f) return null;
   const seite = Z.P.x < f.x ? -1 : 1;
   return { spot: { x: f.x + seite * 52, y: f.y + 10 }, schau: f, rahmen: { x0: f.x - 40, y0: f.y - 110, x1: f.x + 40, y1: f.y + 14 }, tun: () => beiFigur(f) };
@@ -566,6 +606,13 @@ function amGehege(i) {
   Sfx.play('plopp');
   if (!API.oeffneRaum(i)) { g.wackel = 1; sage(Z.texte.gesperrt); }
 }
+function amLoewe() {
+  const r = Z.raub, liste = Array.isArray(Z.texte.loeweSchnarcht) ? Z.texte.loeweSchnarcht : [Z.texte.loeweSchnarcht];
+  r.wach = 2.4; r.wackel = 1; Sfx.play('schnarch');
+  blase(r.x + 40, r.y - 96, '🦁 ' + (liste[Z.loeweNr++ % liste.length] || ''), 2.8, 'loewe');
+  sage(Z.texte.loewe);
+}
+function pollySagt(text, dauer) { if (!Z.hatPolly || !text) return; blase(Z.polly.x, Z.polly.y - 30, text, dauer || 3, 'polly'); ansage(text); }
 function amTor() {
   const frisch = API.status(); if (frisch) Z.status = frisch;
   if (Z.status && Z.status.torBereit) { Sfx.play('plopp'); API.zeigeTor(); }
@@ -578,10 +625,17 @@ function beiFigur(f) {
     if (nx < 0) { sage(Z.status && Z.status.torBereit ? Z.texte.waerterinFertig : Z.texte.torZu); return; }
     zeigeRegel(nx);
   } else if (f.art === 'tier') {
-    let w = null; try { w = API.zufallsWort(); } catch (e) {}
+    let w = null; const kenne = q => !!q && Z.woerter.some(v => v.en === q.en);
+    for (let i = 0; i < 8; i++) { try { w = API.zufallsWort(); } catch (e) { w = null; } if (!kenne(w)) break; }   // möglichst ein Wort, das noch nicht im Rucksack ist
+    f.trickT = 1;
     const text = w ? '🐾 ' + w.en + ' = ' + w.de : '🐾';
     blase(f.x, f.y - 84, text, 3.5, f.id); if (w) ansage(f.name + ': ' + w.en + ' heißt ' + w.de);
-  } else if (f.art === 'waechter') blase(f.x, f.y - 100, '🔦 ' + Z.texte.waechter, 2.5, f.id);
+    if (w && Z.rucksackZiel && !kenne(w) && Z.woerter.length < Z.rucksackZiel) {
+      Z.woerter.push({ en: w.en, de: w.de }); Z.sig = '';
+      if (Z.ruhig) Z.rucksackWig = 1; else Z.fluege.push({ x: f.x, y: f.y - 50, t: 0 });
+      if (Z.woerter.length >= Z.rucksackZiel) Z.rucksackVoll = true;
+    }
+  } else if (f.art === 'waechter') blase(f.x, f.y - 100, '🔦 ' + wahl(Z.texte.waechter), 2.5, f.id);
 }
 function pollyTipp() {
   const nx = naechstes();
@@ -591,13 +645,14 @@ function pollyTipp() {
 function jubeln(i) {
   const g = Z.G[i]; Z.jubel = -1; if (!g) return;
   Sfx.play('jubel'); funken(g.x, g.rect.y0 - 46, 26, { up: 120, sp: 260 }); funken(Z.tafel.x, Z.tafel.y - 40, 14, { up: 100 });
-  Z.pollyJubel = 1.6; blase(Z.polly.x, Z.polly.y - 30, Z.texte.jubel, 2.6, 'polly');
+  const n = Z.status ? Z.status.raeume.filter(r => r.zustand === 'geschafft' || r.zustand === 'unsicher').length : 0, liste = Z.texte.pollyGeschafft;
+  Z.pollyJubel = 1.6; Z.ruhe = 0; pollySagt((Array.isArray(liste) && liste[n - 1]) || Z.texte.jubel, 3);
 }
 function pruefeStatus() {
   const s = API.status(); if (!s) return;
   Z.status = s;
-  const sig = s.raeume.map(r => r.zustand + r.richtig + (r.ziffer == null ? '' : r.ziffer) + (r.kandidaten || []).join('')).join('|') + s.torBereit;
-  if (sig !== Z.sig) { Z.sig = sig; aktualisiereListe(); }
+  const sig = Z.woerter.length + '#' + s.raeume.map(r => r.zustand + r.richtig + (r.ziffer == null ? '' : r.ziffer) + (r.kandidaten || []).join('')).join('|') + s.torBereit;
+  if (sig !== Z.sig || Z.sig === '') { Z.sig = sig; aktualisiereListe(); }
   // Nachtwächter: letzte zwei Minuten, genau einmal pro Mission
   const z = s.zeit;
   if (z && z.mitLimit && !z.pausiert && z.restSekunden != null && z.restSekunden <= 120 && z.restSekunden > 0 && !Z.gewarnt) {
@@ -636,10 +691,33 @@ function schritt(dt) {
   for (const f of Z.figs) {
     if (f.hop > 0) f.hop -= dt * 2;
     if (f.art !== 'waechter') continue;
-    f.geht = false; if (Z.ruhig || f.runde.length < 2) continue;
+    f.geht = false; f.kegel = f.winkel + (Z.ruhig ? 0 : Math.sin(Z.zeit * 0.9) * 0.3);
+    // Trifft sein Licht die Spielfigur, ruft er kurz – er fängt niemanden und hält niemanden auf
+    if (f.ruhe > 0) f.ruhe -= dt;
+    const dP = dist(P.x, P.y, f.x, f.y);
+    if (f.ruhe <= 0 && dP > 30 && dP < 165 && !regelOffen()) {
+      let da = Math.atan2(P.y - f.y, P.x - f.x) - f.kegel; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
+      if (Math.abs(da) < 0.36) { f.ruhe = 16; f.pause = 1.8; f.hop = 1; Sfx.play('huch'); blase(f.x, f.y - 100, '❗ ' + wahl(Z.texte.waechterRuf), 2.6, f.id); Z.pollyJubel = Math.max(Z.pollyJubel || 0, 0.7); }
+    }
+    if (f.pause > 0) { f.pause -= dt; continue; }
+    if (Z.ruhig || f.runde.length < 2) continue;
     const q = f.runde[f.ziel], d = dist(f.x, f.y, q.x, q.y), sp = 46 * dt;
     if (d <= sp) { f.x = q.x; f.y = q.y; f.ziel = (f.ziel + 1) % f.runde.length; }
     else { f.x += (q.x - f.x) / d * sp; f.y += (q.y - f.y) / d * sp; if (Math.abs(q.x - f.x) > 3) f.blick = q.x > f.x ? 1 : -1; const a = Math.atan2(q.y - f.y, q.x - f.x); let da = a - f.winkel; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU; f.winkel += da * Math.min(1, dt * 3); f.geht = true; }
+  }
+  for (const f of Z.figs) if (f.trickT > 0) f.trickT -= dt * 0.9;
+  if (Z.raub.wach > 0) Z.raub.wach -= dt; if (Z.raub.wackel > 0) Z.raub.wackel -= dt * 2.2;
+  if (Z.rucksackWig > 0) Z.rucksackWig -= dt * 1.5;
+  for (let i = Z.fluege.length - 1; i >= 0; i--) { const f = Z.fluege[i]; f.t += dt; if (f.t >= 0.8) { Z.fluege.splice(i, 1); Z.rucksackWig = 1; Sfx.play('plopp'); } }
+  if (Z.rucksackVoll && !Z.fluege.length) { Z.rucksackVoll = false; Sfx.play('jubel'); Z.pollyJubel = 1.6; funken(po.x, po.y, 24, { up: 120, sp: 240 }); sage(Z.texte.rucksackVoll); }
+  // Polly kommentiert: nach der Rückkehr aus einem Gehege, an besonderen Orten und wenn lange nichts passiert
+  const pollyFrei = !Z.blasen.some(b => b.id === 'polly') && Z.jubel < 0 && !regelOffen();
+  if (Z.sagBald && pollyFrei) { pollySagt(Z.sagBald, 3); Z.sagBald = null; }
+  else if (pollyFrei) for (const o of Z.orte) if (!o.gesagt && dist(P.x, P.y, o.x, o.y) < o.r) { o.gesagt = true; pollySagt(o.text, 3.2); break; }
+  if (P.geht || Z.tasten.size) Z.ruhe = 0; else Z.ruhe += dt;
+  if (Z.ruhe > 20 && pollyFrei) {
+    Z.ruhe = -20; const nx = naechstes(), name = nx >= 0 ? Z.G[nx].schild : Z.status && Z.status.torBereit ? Z.tor.name : '';
+    if (name) { pollySagt(fuelle(wahl(Z.texte.pollyWarten), { name }), 3.2); funken(po.x, po.y, 6, { sp: 120 }); }
   }
   for (const g of Z.G) if (g.wackel > 0) g.wackel -= dt * 2.2;
   if (Z.tor.wackel > 0) Z.tor.wackel -= dt * 2.2;
@@ -682,7 +760,8 @@ function verdrahteEingabe() {
     e.preventDefault(); if (regelOffen()) { schliesseRegel(); return; }
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     const p = zuWelt(e); Z.zeiger = { id: e.pointerId, sx: e.clientX, sy: e.clientY, t: Z.zeit, frei: false };
-    const rp = Z.randPfeil, cr = canvas.getBoundingClientRect();
+    const rp = Z.randPfeil, cr = canvas.getBoundingClientRect(), ro = rucksackOrt(); Z.ruhe = 0;
+    if (Z.rucksackZiel && e.clientX - cr.left < ro.x + ro.w + 6 && e.clientY - cr.top > ro.y - 6) { Sfx.play('tipp'); zeigeRucksack(); return; }
     if (rp && dist(e.clientX - cr.left, e.clientY - cr.top, rp.x, rp.y) < 40) { Sfx.play('tipp'); geheZu(rp.id); return; }
     tipp(p.x, p.y); if (Z.zeiger) Z.zeiger.frei = !Z.P.ankunft;   // nur beim freien Laufen folgt die Figur dem Finger
   });
@@ -734,13 +813,15 @@ function aktualisiereListe() {
   const bereit = !!(Z.status && Z.status.torBereit);
   eintraege.push({ id: 'tor', text: Z.tor.name + ', ' + (bereit ? 'bereit: Zahlenschloss öffnen' : 'noch gesperrt') + '. Code bisher: ' + codeZeichen().map(z => z === '_' ? 'offen' : z === '?' ? 'unsicher' : z).join(', ') });
   for (const f of Z.figs) if (f.art === 'waerterin') eintraege.push({ id: f.id, text: f.name + ': Regelkarte zeigen' }); else if (f.art === 'tier') eintraege.push({ id: f.id, text: f.name + ': ein englisches Wort hören' });
+  eintraege.push({ id: 'raub', text: Z.raub.name + ': Der Löwe schläft' });
+  if (Z.rucksackZiel) eintraege.push({ id: 'rucksack', text: 'Wörter-Rucksack öffnen: ' + Z.woerter.length + ' von ' + Z.rucksackZiel + ' Wörtern' });
   const knoepfe = srListe.querySelectorAll('button');
   if (knoepfe.length !== eintraege.length) {
     srListe.textContent = '';
     for (const e of eintraege) {
       const b = document.createElement('button'); b.type = 'button'; b.dataset.ziel = e.id; b.textContent = e.text;
       hoere(b, 'focus', () => { Z.fokus = e.id; }); hoere(b, 'blur', () => { if (Z.fokus === e.id) Z.fokus = null; });
-      hoere(b, 'click', () => { if (regelOffen()) schliesseRegel(); geheZu(e.id); });
+      hoere(b, 'click', () => { if (regelOffen()) schliesseRegel(); if (e.id === 'rucksack') zeigeRucksack(); else geheZu(e.id); });
       srListe.appendChild(b);
     }
   } else eintraege.forEach((e, i) => { if (knoepfe[i].textContent !== e.text) knoepfe[i].textContent = e.text; });
@@ -749,8 +830,15 @@ function aktualisiereListe() {
 /* Regelkarte der Zoowärterin */
 function zeigeRegel(nr) {
   let text = ''; try { text = API.regel(nr) || ''; } catch (e) {}
-  regelBox.querySelector('.zk-regel-titel').textContent = '📋 ' + fuelle(Z.texte.regelTitel, { name: Z.G[nr].schild });
-  regelBox.querySelector('.zk-regel-text').textContent = text || Z.texte.keineRegel;
+  zeigeKarte('📋 ' + fuelle(Z.texte.regelTitel, { name: Z.G[nr].schild }), text || Z.texte.keineRegel);
+}
+function zeigeRucksack() {
+  const liste = Z.woerter.map(w => '🐾 ' + w.en + ' = ' + w.de).join('\n');
+  zeigeKarte('🎒 ' + Z.texte.rucksackTitel + ' (' + Z.woerter.length + '/' + Z.rucksackZiel + ')', liste || Z.texte.rucksackLeer);
+}
+function zeigeKarte(titel, text) {
+  regelBox.querySelector('.zk-regel-titel').textContent = titel;
+  regelBox.querySelector('.zk-regel-text').textContent = text;
   regelBox.hidden = false; Z.tasten.clear();
   try { regelBox.querySelector('button').focus({ preventScroll: true }); } catch (e) {}
 }
@@ -765,7 +853,7 @@ const CSS = '.zk{position:relative;margin:0 0 12px;border:4px solid #000;border-
   '.zk-regel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:92%;max-width:460px;max-height:92%;overflow:auto;padding:14px 16px;background:#fffbe0;color:#14213d;border:4px solid #000;border-radius:16px;box-shadow:0 6px 0 rgba(0,0,0,.45);font-size:1.05rem;line-height:1.45}' +
   '.zk-regel[hidden]{display:none}' +
   '.zk-regel-titel{margin:0 0 6px;font-size:1.15rem}' +
-  '.zk-regel-text{margin:0 0 12px}' +
+  '.zk-regel-text{margin:0 0 12px;white-space:pre-line}' +
   '.zk-regel button{min-width:48px;min-height:48px;padding:8px 18px;font:inherit;font-weight:700;color:#14213d;background:#ffd23f;border:3px solid #000;border-radius:12px;cursor:pointer}';
 
 function baueDom() {
@@ -777,7 +865,7 @@ function baueDom() {
   ctx = canvas.getContext('2d'); if (!ctx) throw new Error('Zoo-Karte: Zeichenfläche nicht verfügbar');
   srListe = document.createElement('div'); srListe.className = 'zk-sr'; srListe.setAttribute('role', 'group'); srListe.setAttribute('aria-label', 'Orte auf der Zoo-Karte');
   srLive = document.createElement('div'); srLive.className = 'zk-sr'; srLive.setAttribute('role', 'status'); srLive.setAttribute('aria-live', 'polite');
-  regelBox = document.createElement('div'); regelBox.className = 'zk-regel'; regelBox.hidden = true; regelBox.setAttribute('role', 'dialog'); regelBox.setAttribute('aria-label', 'Regelkarte');
+  regelBox = document.createElement('div'); regelBox.className = 'zk-regel'; regelBox.hidden = true; regelBox.setAttribute('role', 'dialog'); regelBox.setAttribute('aria-label', 'Kärtchen');
   const h = document.createElement('h3'); h.className = 'zk-regel-titel'; const p = document.createElement('p'); p.className = 'zk-regel-text';
   const zu = document.createElement('button'); zu.type = 'button'; zu.textContent = 'Schließen'; hoere(zu, 'click', schliesseRegel);
   regelBox.append(h, p, zu);
@@ -815,6 +903,8 @@ function zeigen(status) {
   if (Z.neueMission || !Z.P) neuStart();
   Z.P.weg = null; Z.P.ankunft = null; Z.tasten.clear(); Z.zeiger = null; Z.pollT = 0;
   pruefeStatus(); aktualisiereListe(); kameraZu(1);
+  if (Z.zurueck) { Z.zurueck = false; const nx = naechstes(); if (nx >= 0 && Z.jubel < 0) Z.sagBald = wahl(Z.texte.pollyZurueck); }
+  Z.ruhe = 0;
   zeichne(ctx, Z.zeit);
   starteSchleife();
 }
@@ -837,6 +927,7 @@ API.on('bildschirm', sicher(e => {
   if (angemeldet) return;
   if (e && e.id === 'uebersicht') setTimeout(sicher(anmelden), 0); else anmelden();
 }));
+API.on('zurueck', sicher(e => { Z.zurueck = !!(e && e.von === 'raum'); }));
 API.on('ziffer', sicher(e => { if (e && typeof e.raum === 'number') Z.jubel = e.raum; }));
 sicher(anmelden)();
 
@@ -846,7 +937,7 @@ window.ZooKarte = Object.freeze({
   speichert: 'nichts',
   sichtbar: () => Z.sichtbar,
   laeuft: () => !!Z.raf,
-  zustand: () => ({ sichtbar: Z.sichtbar, schleife: !!Z.raf, figur: Z.P ? { x: Math.round(Z.P.x), y: Math.round(Z.P.y), geht: Z.P.geht } : null, massstab: Z.scale, flaeche: { b: Z.w, h: Z.h }, gewarnt: Z.gewarnt, ziele: Z.gebaut ? alleZiele() : [] }),
+  zustand: () => ({ sichtbar: Z.sichtbar, schleife: !!Z.raf, figur: Z.P ? { x: Math.round(Z.P.x), y: Math.round(Z.P.y), geht: Z.P.geht } : null, massstab: Z.scale, flaeche: { b: Z.w, h: Z.h }, gewarnt: Z.gewarnt, ruhe: Math.round(Z.ruhe), figuren: Z.figs.map(f => ({ id: f.id, x: Math.round(f.x), y: Math.round(f.y) })), woerter: Z.woerter.length, blasen: Z.blasen.map(b => b.id + ':' + b.text), ziele: Z.gebaut ? alleZiele() : [] }),
   geheZu: id => Z.sichtbar ? geheZu(String(id)) : false,
   laufzeit: (von, nach) => { const a = zielVon(von), b = zielVon(nach); if (!a || !b) return null; const w = findeWeg(a.spot.x, a.spot.y, b.spot.x, b.spot.y); if (!w) return null; const l = wegLaenge(w, a.spot.x, a.spot.y); return Math.round(l / Math.max(GESCHW, l / MAX_LAUFZEIT) * 10) / 10; },
   randPfeil: () => { if (!Z.randPfeil || !canvas) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + Z.randPfeil.x, y: r.top + Z.randPfeil.y, id: Z.randPfeil.id }; },
