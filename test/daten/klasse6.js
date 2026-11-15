@@ -1,15 +1,47 @@
 /* =====================================================================
    KLASSE 6  ·  Red Line 2  ·  alle Inhalte für Klasse 6
    ---------------------------------------------------------------------
-   NOCH IN ARBEIT: Hier gibt es erst den Namen der Welt und die Themenliste.
-   Solange „raeume“ und Aufgaben fehlen, zeigt das Startmenü „Kommt bald!“.
+   NOCH IN ARBEIT: Die Welt (Geschichte, Räume, Figur) ist fertig, die Aufgaben fehlen noch.
+   Solange Aufgaben fehlen, zeigt das Startmenü „Kommt bald!“.
+   Vorschau der Welt mit den Aufgaben aus Klasse 5: Adresse mit ?welt=6
    Wie eine fertige Klasse aussieht: siehe klasse5.js und klasse-vorlage.js.
    ===================================================================== */
 
 const K6 = neueKlasse(6);   // bitte nicht ändern
 
 // 1) DIE WELT
-K6.welt = { name: "Das Piratenschiff", emoji: "🏴‍☠️" };
+K6.welt = {
+  name: "Das Piratenschiff", emoji: "🏴‍☠️",
+  figur: "Käpt'n Grammar",
+  intro: "Ahoi, ihr Landratten! Ihr habt euch als blinde Passagiere auf mein Schiff geschlichen – mutig! " +
+         "Aber an Land kommt ihr nur mit dem Beiboot, und das hängt an einem Zahlenschloss. " +
+         "Meine Crew hat die vier Ziffern auf dem Schiff versteckt. Löst die Rätsel in allen vier Räumen, dann lasse ich euch ziehen!",
+  raeume: [
+    { name: "Kombüse",          emoji: "🍲" },
+    { name: "Kapitänskajüte",   emoji: "🧭" },
+    { name: "Laderaum",         emoji: "📦" },
+    { name: "Ausguck",          emoji: "🔭" }
+  ],
+  zusatzraum: { name: "Pulverkammer", emoji: "💣", text: "Vorsicht, die Lunte brennt! Antwortet, bevor es knallt!" },
+  ausgang:    { name: "Beiboot", emoji: "🚣" },
+  finale:     "Das Schloss springt auf! Ihr rudert im Beiboot davon. Käpt'n Grammar salutiert: „Gute Fahrt, ihr Grammatik-Piraten!“",
+  gescheitert:"Arrr! Die Crew hat euch erwischt. Strafe: Deck schrubben! Versucht es gleich noch einmal.",
+  gescheitertTor: "Dreimal der falsche Code – das Beiboot bleibt angekettet und die Crew wird misstrauisch. Versucht es gleich noch einmal!",
+  saetze: {
+    start:            ["Leinen los! Der erste Raum ist offen. Tippt ihn an!"],
+    richtig:          ["Arrr, richtig!", "Ein echter Pirat!", "Volltreffer!", "Gut gemacht, Matrose!", "Das gibt eine Extraportion Zwieback!"],
+    falsch:           ["Kielholen wäre übertrieben – lest die Erklärung und versucht es nochmal.", "Fast! Schaut euch die Regel genau an.", "Kein Grund zur Meuterei – nochmal!"],
+    loesung:          ["Das war eine harte Nuss. Schaut euch die Lösung an, gleich kommt eine neue Aufgabe."],
+    raumGeschafft:    ["Raum geschafft! Jetzt noch die Pulverkammer …", "Alle Schlüsselteile an Bord!"],
+    zusatzStart:      ["Pssst … die Lunte brennt! Schnell und genau antworten!"],
+    zusatzGeschafft:  ["Lunte ausgetreten! Die Ziffer gehört euch!"],
+    zusatzGescheitert:["BUMM! Nur Rauch, keine Sorge. Eine der drei Ziffern stimmt."],
+    zeitWarnung:      ["Beeilt euch, die Crew kommt gleich zurück an Bord!"],
+    torFalsch:        ["Das Schloss klemmt. Schaut auf die Lämpchen: Grün stimmt, Rot noch nicht!"],
+    zwilling:         ["Hier ist eine ähnliche Aufgabe. Ihr schafft das!"],
+    torBereit:        ["Alle Räume geschafft! Stellt den Code am Beiboot ein."]
+  }
+};
 
 // 2) DIE THEMEN (laut „Themenuebersicht“, Red Line 2)
 K6.themen = [

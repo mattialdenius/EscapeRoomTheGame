@@ -1,15 +1,47 @@
 /* =====================================================================
    KLASSE 9  ·  Red Line 5  ·  alle Inhalte für Klasse 9
    ---------------------------------------------------------------------
-   NOCH IN ARBEIT: Hier gibt es erst den Namen der Welt und die Themenliste.
-   Solange „raeume“ und Aufgaben fehlen, zeigt das Startmenü „Kommt bald!“.
+   NOCH IN ARBEIT: Die Welt (Geschichte, Räume, Figur) ist fertig, die Aufgaben fehlen noch.
+   Solange Aufgaben fehlen, zeigt das Startmenü „Kommt bald!“.
+   Vorschau der Welt mit den Aufgaben aus Klasse 5: Adresse mit ?welt=9
    Wie eine fertige Klasse aussieht: siehe klasse5.js und klasse-vorlage.js.
    ===================================================================== */
 
 const K9 = neueKlasse(9);   // bitte nicht ändern
 
 // 1) DIE WELT
-K9.welt = { name: "Die Agentenzentrale", emoji: "🔐" };
+K9.welt = {
+  name: "Die Agentenzentrale", emoji: "🔐",
+  figur: "Agent Nova",
+  intro: "Nova here, on the radio. Bad news: our headquarters is in lockdown and you're inside. " +
+         "The override code is split into four parts, hidden in four sections of the building. " +
+         "Find them, enter the code at the exit, get out. No pressure. Well – a little pressure.",
+  raeume: [
+    { name: "Server Room",    emoji: "💾" },
+    { name: "Gadget Lab",     emoji: "🧪" },
+    { name: "Briefing Room",  emoji: "📋" },
+    { name: "Garage",         emoji: "🏍️" }
+  ],
+  zusatzraum: { name: "Laser Room", emoji: "🚨", text: "Lasers are moving. Answer before they reach you." },
+  ausgang:    { name: "Emergency Exit", emoji: "🚪" },
+  finale:     "Lockdown over. You're out. Nova on the radio: “Clean job. I'll pretend I'm not impressed.”",
+  gescheitert:"Security caught you. Mission failed – new attempt.",
+  gescheitertTor: "Three wrong codes – full lockdown. Mission failed – new attempt.",
+  saetze: {
+    start:            ["First section is open. Go."],
+    richtig:          ["Correct.", "Nice.", "Clean.", "Good.", "That works."],
+    falsch:           ["Negative. Read the explanation and try again.", "Close. Check the rule.", "Even agents make mistakes. Again."],
+    loesung:          ["That was a hard one. Check the answer – new task incoming."],
+    raumGeschafft:    ["Section cleared. Next: the laser room …", "Code part secured."],
+    zusatzStart:      ["Lasers on. Fast and accurate."],
+    zusatzGeschafft:  ["Through the lasers. The digit is yours."],
+    zusatzGescheitert:["Alarm triggered – but only briefly. One of these three digits is right."],
+    zeitWarnung:      ["Security is on its way. Hurry."],
+    torFalsch:        ["Access denied. Check the lights: green is right, red is not yet."],
+    zwilling:         ["Similar task. You've got this."],
+    torBereit:        ["All sections cleared. Enter the code at the exit."]
+  }
+};
 
 // 2) DIE THEMEN (laut „Themenuebersicht“, Red Line 5)
 K9.themen = [
