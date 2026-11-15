@@ -134,3 +134,45 @@ K9.themen = [
   { id: "9-G10", klasse: 9, unit: 4, titel: "Zukunftszeiten (will und going to)", regel: "" },
   { id: "9-G11", klasse: 9, unit: 4, titel: "Zukunftszeiten (simple present und present progressive)", regel: "" }
 ];
+
+// =====================================================================
+// 8) MINISPIELE
+//    Reward after a cleared bonus room: button „🎁 Minispiel?“. 30 seconds at most, does NOT count for the code.
+//    Nur die Spiele, die unter „spiele“ stehen, werden in dieser Welt angeboten. Die Spieltechnik steht in spiele/minispiele.js.
+//    titel / anleitung / erfolg = Texte (einfaches Englisch); ziel = so viele Punkte braucht man.
+//    Beim Spiel codeknacker ist ziel zugleich die Länge des Codes (3 bis 5).
+// =====================================================================
+K9.minispiele = {
+  spiele: {
+    codeknacker: {
+      titel: "💾 Crack the code",
+      anleitung: "Find the four-digit code. Tap four digits. After each try you get a hint for every digit: ● right place, ◐ wrong place, ○ not in the code.",
+      ziel: 4,
+      erfolg: "Access granted. Nova: “Took you long enough.”"
+    },
+    lasergitter: {
+      titel: "🚨 Laser corridor",
+      anleitung: "The laser switches on and off. Tap when it says OFF to run through. Tap at the wrong moment and you lose a second, nothing more.",
+      ziel: 6,
+      erfolg: "Six gates, zero alarms. Clean."
+    },
+    rutsche: {
+      titel: "🏍️ Garage run",
+      anleitung: "Tap to jump. Get the bike over barriers and crates and collect the data disks 💾.",
+      ziel: 8,
+      erfolg: "Eight disks. Please don't scratch the bike."
+    },
+    nachtflug: {
+      titel: "🛸 Drone flight",
+      anleitung: "Tap to keep the drone in the air. Fly between the towers and collect the signals 📡. Bumping into things is fine.",
+      ziel: 8,
+      erfolg: "Eight signals. The drone is still in one piece."
+    }
+  },
+  codeknacker: { ziffern: 5, legende: "● right place · ◐ wrong place · ○ not in the code", start: "Tap four digits.", fertig: "Code cracked." },
+  lasergitter: { figur: "🕵️", ziel: "🚪", an: "ON", aus: "OFF", hinweis: "Tap when the laser is OFF.", autsch: ["Zap. Wait for OFF.", "Too early.", "Patience, agent."] },
+  rutsche: { figur: "🏍️", fisch: "💾", hindernisse: ["🚧", "📦", "🛢️"], hintergrund: ["🏢", "☁️", "🏢", "☁️"] },
+  rutscheAutsch: ["Crash. Keep going.", "Mind the barrier.", "Ouch.", "Back on the bike."],
+  flug: { figur: "🛸", stern: "📡", krone: "🏢", himmel: ["✨", "·", "🌙", "·", "✨", "·"] },
+  flugAutsch: ["Bump. Still flying.", "Careful.", "Close one.", "Rotor check … fine."]
+};

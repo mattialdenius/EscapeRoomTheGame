@@ -28,6 +28,8 @@
           vorher). Neu: Grundstil „neutral“, Stil-Dateien für Klasse 6–10,
           Begleitfiguren, die am Boden mitlaufen, allgemeine Hindernisse,
           Rollen-Namen für Figuren (begleiter, regel, zeit, wort).
+          Die Jubel-Blase nach einer neuen Ziffer hängt jetzt unter der
+          Spielfigur, damit Schild und Ziffer lesbar bleiben (alle Welten).
      0.3  (13.11.2026)  Wörter-Rucksack wieder entfernt. Die Tiere am Weg
           zeigen ein Wort, möglichst nicht zweimal dasselbe.
      0.2  (13.11.2026)  Lebendigere Figuren: Wächter ruft, Begleitfigur
@@ -588,11 +590,11 @@ function zeichneBlase(c, b) {
   if (z) zeilen.push(z);
   let w = 0; for (const l of zeilen) w = Math.max(w, c.measureText(l).width); w += 26;
   const h = zeilen.length * px * 1.35 + 16, ax = (b.x - Z.cam.x) * Z.scale, ay = (b.y - Z.cam.y) * Z.scale;
-  const x = clamp(ax, w / 2 + 6, Z.w - w / 2 - 6), y = clamp(ay - h / 2 - 14, h / 2 + 6, Z.h - h / 2 - 6);
+  const x = clamp(ax, w / 2 + 6, Z.w - w / 2 - 6), u = b.unten ? -1 : 1, y = clamp(ay - u * (h / 2 + 14), h / 2 + 6, Z.h - h / 2 - 6);   // unten: Blase hängt unter der Figur (verdeckt das Schild nicht)
   c.globalAlpha = clamp(Math.min(b.t * 3, (b.max - b.t) * 6), 0, 1);
-  tri(c, x - 10, y + h / 2 - 2, x + 10, y + h / 2 - 2, clamp(ax, x - w / 2 + 14, x + w / 2 - 14), y + h / 2 + 12); fs(c, '#fff', '#000', 3);
+  tri(c, x - 10, y + u * (h / 2 - 2), x + 10, y + u * (h / 2 - 2), clamp(ax, x - w / 2 + 14, x + w / 2 - 14), y + u * (h / 2 + 12)); fs(c, '#fff', '#000', 3);
   rr(c, x - w / 2, y - h / 2, w, h, 12); fs(c, '#fff', '#000', 3);
-  c.fillStyle = '#fff'; c.fillRect(x - 8, y + h / 2 - 4, 16, 5);
+  c.fillStyle = '#fff'; c.fillRect(x - 8, y + u * (h / 2 - 1.5) - 2.5, 16, 5);
   c.fillStyle = '#14213d'; zeilen.forEach((l, i) => c.fillText(l, x, y - h / 2 + 8 + px * 0.68 + i * px * 1.35));
   c.globalAlpha = 1;
 }
@@ -685,6 +687,7 @@ function jubeln(i) {
   Sfx.play('jubel'); funken(g.x, g.rect.y0 - 46, 26, { up: 120, sp: 260 }); funken(Z.tafel.x, Z.tafel.y - 40, 14, { up: 100 });
   const n = Z.status ? Z.status.raeume.filter(r => r.zustand === 'geschafft' || r.zustand === 'unsicher').length : 0, liste = Z.texte.pollyGeschafft;
   Z.pollyJubel = 1.6; Z.ruhe = 0; pollySagt((Array.isArray(liste) && liste[n - 1]) || Z.texte.jubel, 3);
+  const jb = Z.blasen.find(b => b.id === 'polly'); if (jb) jb.unten = true;   // Jubel-Blase unter die Figur: Schild und neue Ziffer bleiben lesbar
 }
 function pruefeStatus() {
   const s = API.status(); if (!s) return;
@@ -759,7 +762,7 @@ function schritt(dt) {
   for (const g of Z.G) if (g.wackel > 0) g.wackel -= dt * 2.2;
   if (Z.tor.wackel > 0) Z.tor.wackel -= dt * 2.2;
   if (Z.marker && (Z.marker.t -= dt) <= 0) Z.marker = null;
-  for (let i = Z.blasen.length - 1; i >= 0; i--) { const b = Z.blasen[i]; b.t -= dt; if (b.id === 'polly') { b.x = po.x; b.y = pollyKopf(); } if (b.t <= 0) Z.blasen.splice(i, 1); }
+  for (let i = Z.blasen.length - 1; i >= 0; i--) { const b = Z.blasen[i]; b.t -= dt; if (b.id === 'polly') { b.x = po.x; b.y = b.unten ? Z.P.y + 14 : pollyKopf(); } if (b.t <= 0) Z.blasen.splice(i, 1); }
   for (let i = Z.fx.length - 1; i >= 0; i--) { const q = Z.fx[i]; q.life -= dt; if (q.life <= 0) { Z.fx.splice(i, 1); continue; } q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; }
   kameraZu(Z.ruhig ? 1 : Math.min(1, dt * 5));
   Z.pollT -= dt; if (Z.pollT <= 0) { Z.pollT = 0.5; pruefeStatus(); }

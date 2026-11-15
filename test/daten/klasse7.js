@@ -137,3 +137,51 @@ K7.themen = [
   { id: "7-G14", klasse: 7, unit: 5, titel: "Possessivpronomen", regel: "" },
   { id: "7-G15", klasse: 7, unit: 5, titel: "Modale Hilfsverben", regel: "" }
 ];
+
+// =====================================================================
+// 8) MINISPIELE
+//    Belohnung nach einem geschafften Zusatzraum: Knopf „🎁 Minispiel?“. Höchstens 30 Sekunden, zählt NICHT für den Code.
+//    Nur die Spiele, die unter „spiele“ stehen, werden in dieser Welt angeboten.
+//    titel / anleitung / erfolg = Texte; ziel = so viele Punkte braucht man. Die Spieltechnik steht in spiele/minispiele.js.
+// =====================================================================
+K7.minispiele = {
+  spiele: {
+    taschenlampe: {
+      titel: "🔦 Nachts im Museum",
+      anleitung: "Das Licht ist aus. Fahrt mit dem Finger durch den Saal und haltet die Taschenlampe kurz auf ein Ausstellungsstück – manche stehen hinter Säulen.",
+      ziel: 6,
+      erfolg: "Alle Stücke gefunden. Die Sammlung ist vollständig."
+    },
+    rutsche: {
+      titel: "🦖 Saurier-Sprint",
+      anleitung: "Tippt, damit der Saurier springt. Hüpft über Knochen und Felsen und sammelt die Eier 🥚.",
+      ziel: 8,
+      erfolg: "Acht Eier gerettet. Die Urzeit dankt."
+    },
+    nachtflug: {
+      titel: "🦇 Flug durch die Säulenhalle",
+      anleitung: "Tippt, damit die Fledermaus flattert. Fliegt zwischen den Säulen hindurch und sammelt Sanduhren ⏳. Anstoßen kostet nur etwas Zeit.",
+      ziel: 8,
+      erfolg: "Acht Sanduhren. Zeit gewonnen."
+    }
+  },
+
+  // ---------- Nachts im Museum (Technik: taschenlampe) ----------
+  nachtTiere: [
+    { emoji: "🏺", en: "vase",     de: "Vase" },        { emoji: "👑", en: "crown",    de: "Krone" },
+    { emoji: "🦴", en: "bone",     de: "Knochen" },     { emoji: "⚔️", en: "swords",   de: "Schwerter" },
+    { emoji: "🛡️", en: "shield",   de: "Schild" },      { emoji: "💎", en: "diamond",  de: "Diamant" },
+    { emoji: "📜", en: "scroll",   de: "Schriftrolle" },{ emoji: "🗿", en: "statue",   de: "Statue" },
+    { emoji: "🪙", en: "coin",     de: "Münze" },       { emoji: "🔭", en: "telescope", de: "Fernrohr" },
+    { emoji: "🤖", en: "robot",    de: "Roboter" },     { emoji: "🕰️", en: "clock",    de: "Uhr" }
+  ],
+  kulisse: ["🏛️", "🪑", "🏛️", "🖼️", "🏛️", "🪴", "🖼️", "🏛️", "🪑", "🏛️"],
+
+  // ---------- Saurier-Sprint (Technik: rutsche) ----------
+  rutsche: { figur: "🦖", fisch: "🥚", hindernisse: ["🦴", "🪨", "🌵"], hintergrund: ["🌋", "☁️", "🌴", "☁️"] },
+  rutscheAutsch: ["Rumms. Weiter.", "Gestolpert. Weiter!", "Autsch.", "Kopf hoch, weiter."],
+
+  // ---------- Flug durch die Säulenhalle (Technik: nachtflug) ----------
+  flug: { figur: "🦇", stern: "⏳", krone: "🏛️", himmel: ["✨", "·", "🖼️", "·", "✨", "·"] },
+  flugAutsch: ["Autsch, eine Säule.", "Weiterflattern!", "Knapp daneben.", "Kurz getaumelt – weiter."]
+};

@@ -128,3 +128,45 @@ K10.themen = [
   { id: "10-G6", klasse: 10, unit: 3, titel: "Vergangenheitszeiten", regel: "" },
   { id: "10-G7", klasse: 10, unit: 3, titel: "Bedingungssätze Typ III", regel: "" }
 ];
+
+// =====================================================================
+// 8) MINISPIELE
+//    Reward after a cleared bonus room: button „🎁 Minispiel?“. 30 seconds at most, does NOT count for the code.
+//    Nur die Spiele, die unter „spiele“ stehen, werden in dieser Welt angeboten. Die Spieltechnik steht in spiele/minispiele.js.
+//    titel / anleitung / erfolg = Texte (einfaches Englisch); ziel = so viele Punkte braucht man.
+//    Beim Spiel codeknacker ist ziel zugleich die Länge des Codes (3 bis 5).
+// =====================================================================
+K10.minispiele = {
+  spiele: {
+    nachtflug: {
+      titel: "🚀 Asteroid run",
+      anleitung: "Tap to fire the engine. Fly between the asteroids and collect the power cells 🔋. A bump only costs you a moment.",
+      ziel: 8,
+      erfolg: "Eight power cells. ARIA is almost impressed."
+    },
+    rutsche: {
+      titel: "🤖 Rover run",
+      anleitung: "Tap to make the rover jump. Get over rocks and crates and collect the power cells 🔋.",
+      ziel: 8,
+      erfolg: "Battery full. The rover beeps happily."
+    },
+    codeknacker: {
+      titel: "🛰️ Reboot code",
+      anleitung: "Find the four-digit code. Tap four digits. After each try you get a hint for every digit: ● right place, ◐ wrong place, ○ not in the code.",
+      ziel: 4,
+      erfolg: "System rebooted. ARIA: “I could have done that. I chose not to.”"
+    },
+    lasergitter: {
+      titel: "🌌 Airlock timing",
+      anleitung: "The energy field switches on and off. Tap when it says OFF to float through. A wrong tap only costs you a second.",
+      ziel: 6,
+      erfolg: "Six fields passed. No oxygen wasted."
+    }
+  },
+  flug: { figur: "🚀", stern: "🔋", krone: "🪨", himmel: ["✨", "·", "🪐", "·", "✨", "·"] },
+  flugAutsch: ["Bump. Hull intact.", "Keep the engine on.", "Close one.", "Minor dent. Continue."],
+  rutsche: { figur: "🤖", fisch: "🔋", hindernisse: ["🪨", "📦", "🛢️"], hintergrund: ["🪐", "✨", "🌍", "✨"] },
+  rutscheAutsch: ["Bump. Keep rolling.", "Mind the rocks.", "Ouch.", "Wheels still on. Go."],
+  codeknacker: { ziffern: 5, legende: "● right place · ◐ wrong place · ○ not in the code", start: "Tap four digits.", fertig: "Code cracked." },
+  lasergitter: { figur: "🧑‍🚀", ziel: "🛟", an: "ON", aus: "OFF", hinweis: "Tap when the field is OFF.", autsch: ["Zap. Wait for OFF.", "Too early.", "Patience, human."] }
+};

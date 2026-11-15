@@ -1,7 +1,7 @@
 /* =====================================================================
    MINISPIELE für den Grammar Escape Room (Belohnung nach dem Zusatzraum)
    ---------------------------------------------------------------------
-   Version:  minispiele 0.3 (passt zu App-Version 0.6.6, Testbereich)
+   Version:  minispiele 0.4 (passt zu App-Version 0.6.8, Testbereich)
    Inhalt:   fuettern (Fütterungszeit), taschenlampe (Taschenlampen-Suche),
              seeloewe (Robben-Jonglage), obstkorb (Obstkorb), schaukel (Affen-Schaukel),
              nachtflug (Pollys Nachtflug), rutsche (Pinguin-Rutsche) – beide mit dem
@@ -16,6 +16,9 @@
    Bedienung: ein Finger (Ziehen oder Tippen), Maus, Tastatur (Pfeile, Enter).
 
    Änderungsliste:
+     0.4 (15.11.2026)  Neu für die Welten der Klassen 8–10: codeknacker (Code knacken mit
+                       Hinweisen) und lasergitter (im richtigen Moment durchlaufen).
+                       Die sieben bisherigen Spiele sind unverändert.
      0.3 (14.11.2026)  Neu: Pollys Nachtflug und Pinguin-Rutsche mit beweglichem Hintergrund.
      0.2 (14.11.2026)  Taschenlampe schwerer (kleineres Licht, 6 Tiere, teils hinter
                        Büschen, Licht ½ Sekunde draufhalten). Neu: Obstkorb, Affen-Schaukel.
@@ -564,5 +567,137 @@ function rutsche(buehne, ctx){
   return () => { cancelAnimationFrame(raf); clearTimeout(mtimer); buehne.removeEventListener("pointerdown", tipp); buehne.removeEventListener("keydown", taste); buehne.removeAttribute("tabindex"); };
 }
 
-window.MINISPIELE = Object.freeze({ fuettern, taschenlampe, seeloewe, obstkorb, schaukel, nachtflug, rutsche });
+// =====================================================================
+// 8) CODE KNACKEN – Ziffern tippen, Hinweise lesen (für Klasse 8–10)
+//    Der Code hat so viele Stellen wie das Ziel (ziel: 4 = vierstelliger Code).
+//    Nach jedem Versuch gibt es zu jeder Stelle einen Hinweis als FORM:
+//    ● richtige Ziffer am richtigen Platz · ◐ Ziffer kommt vor, aber woanders · ○ kommt nicht vor.
+//    Jede geknackte Stelle zählt einen Punkt und bleibt stehen.
+//    Daten: KN.minispiele.codeknacker = { ziffern: 5, legende: "…", start: "…", fertig: "…" }
+// =====================================================================
+function codeknacker(buehne, ctx){
+  const D = (ctx.daten && ctx.daten.codeknacker) || {}, n = clamp(ctx.ziel, 3, 5), max = clamp(Math.round(D.ziffern) || 5, n, 9);
+  const code = mischen(Array.from({ length: max }, (_, i) => i + 1)).slice(0, n);   // jede Ziffer höchstens einmal
+  const fest = Array(n).fill(false), eingabe = Array(n).fill(null), raus = new Set();
+  const wrap = el("div", "ms-ck"), legende = el("p", "ms-ck-legende", D.legende || "● right digit, right place · ◐ right digit, wrong place · ○ not in the code");
+  const verlauf = el("div", "ms-ck-verlauf"), reihe = el("div", "ms-ck-reihe"), tasten = el("div", "ms-ck-tasten"), meldung = el("p", "ms-ck-meldung", D.start || "Tap " + n + " digits.");
+  verlauf.setAttribute("role", "log"); meldung.setAttribute("role", "status");
+  wrap.append(legende, verlauf, reihe, meldung, tasten); buehne.appendChild(wrap);
+  const NAME = { "●": "right place", "◐": "wrong place", "○": "not in the code" };
+  let timer = null, gesperrt = false;
+  function zeichneReihe(){
+    reihe.replaceChildren();
+    for(let i = 0; i < n; i++){ const f = el("span", "ms-ck-feld" + (fest[i] ? " fest" : ""), fest[i] ? String(code[i]) : eingabe[i] == null ? "_" : String(eingabe[i])); if(fest[i]) f.setAttribute("aria-label", "position " + (i + 1) + ": " + code[i] + ", cracked"); reihe.appendChild(f); }
+  }
+  function zeichneTasten(){
+    tasten.replaceChildren();
+    for(let z = 1; z <= max; z++){
+      const b = el("button", "ms-ck-taste" + (raus.has(z) ? " raus" : ""), String(z)); b.type = "button";
+      if(raus.has(z)) b.setAttribute("aria-label", z + ", not in the code");
+      b.addEventListener("click", () => tippe(z)); tasten.appendChild(b);
+    }
+    const loesch = el("button", "ms-ck-taste breit", "⌫"); loesch.type = "button"; loesch.setAttribute("aria-label", "delete"); loesch.addEventListener("click", zurueck); tasten.appendChild(loesch);
+  }
+  function zurueck(){ if(gesperrt) return; for(let i = n - 1; i >= 0; i--) if(!fest[i] && eingabe[i] != null){ eingabe[i] = null; break; } zeichneReihe(); }
+  function tippe(z){
+    if(gesperrt || !ctx.laeuft()) return;
+    const frei = eingabe.findIndex((v, i) => !fest[i] && v == null); if(frei < 0) return;
+    eingabe[frei] = z; ctx.ton("klick"); zeichneReihe();
+    if(eingabe.every((v, i) => fest[i] || v != null)) pruefe();
+  }
+  function pruefe(){
+    gesperrt = true;
+    const versuch = eingabe.map((v, i) => fest[i] ? code[i] : v), zeile = el("div", "ms-ck-zeile"); let neu = 0;
+    versuch.forEach((v, i) => {
+      const s = v === code[i] ? "●" : code.includes(v) ? "◐" : "○";
+      if(s === "○") raus.add(v);
+      const f = el("span", "ms-ck-hinweis", v + " " + s); f.setAttribute("aria-label", v + ": " + NAME[s]); zeile.appendChild(f);
+      if(s === "●" && !fest[i]){ fest[i] = true; neu++; }
+    });
+    verlauf.prepend(zeile); while(verlauf.children.length > 2) verlauf.lastChild.remove();   // die letzten zwei Versuche bleiben sichtbar
+    for(let i = 0; i < n; i++) eingabe[i] = null;
+    zeichneReihe(); zeichneTasten();
+    const alle = fest.every(Boolean);
+    meldung.textContent = alle ? (D.fertig || "Code cracked.") : neu ? "● +" + neu : "…";
+    ctx.ton(neu ? "richtig" : "falsch");
+    for(let k = 0; k < neu; k++) ctx.punkt();
+    timer = setTimeout(() => { gesperrt = false; }, 250);
+  }
+  const taste = e => { if(/^[1-9]$/.test(e.key) && +e.key <= max){ e.preventDefault(); tippe(+e.key); } else if(e.key === "Backspace"){ e.preventDefault(); zurueck(); } };
+  buehne.addEventListener("keydown", taste);
+  zeichneReihe(); zeichneTasten();
+  return () => { clearTimeout(timer); buehne.removeEventListener("keydown", taste); };
+}
+
+// =====================================================================
+// 9) LASERGITTER – im richtigen Moment durchlaufen (für Klasse 8–10)
+//    Ein Laser geht an und aus. Tippen, wenn er AUS ist: Die Figur läuft durch (1 Punkt).
+//    Tippen, wenn er AN ist: kurzer Schreck, kein Spielende. AN/AUS steht als Wort da
+//    und der Strahl ist durchgezogen oder gestrichelt (nicht nur Farbe).
+//    Daten: KN.minispiele.lasergitter = { figur: "🕵️", ziel: "🚪", an: "ON", aus: "OFF", hinweis: "…", autsch: ["…"] }
+// =====================================================================
+function lasergitter(buehne, ctx){
+  const D = (ctx.daten && ctx.daten.lasergitter) || {};
+  const bahn = el("div", "ms-lg"), figur = el("div", "ms-lg-figur", D.figur || "🕵️"), strahl = el("div", "ms-lg-strahl"), schild = el("div", "ms-lg-schild"), tor = el("div", "ms-lg-tor", D.ziel || "🚪");
+  const hinweis = el("p", "ms-lg-hinweis", D.hinweis || "Tap when the laser is OFF."), meldung = el("div", "ms-ro-meldung");
+  bahn.append(hinweis, figur, strahl, schild, tor, meldung); buehne.appendChild(bahn);
+  buehne.tabIndex = 0; buehne.setAttribute("aria-label", (D.hinweis || "Tap when the laser is OFF.") + " Enter = go.");
+  let an = true, rest = 0.8, runde = 0, sperre = 0, raf = 0, t0 = 0, mtimer = null, laeuftDurch = 0;
+  const dauer = () => { const tempo = Math.max(0.6, 1 - runde * 0.05); return an ? (0.55 + Math.random() * 0.6) * tempo : (0.75 + Math.random() * 0.35) * (ctx.reduziert ? 1.4 : 1); };
+  function zeige(text){ meldung.textContent = text; meldung.classList.add("an"); clearTimeout(mtimer); mtimer = setTimeout(() => meldung.classList.remove("an"), 800); }
+  function zeichne(){ strahl.classList.toggle("an", an); schild.textContent = an ? (D.an || "ON") : (D.aus || "OFF"); schild.classList.toggle("an", an); }
+  function schritt(t){
+    const dt = Math.min(0.05, (t - (t0 || t)) / 1000); t0 = t;
+    if(!ctx.laeuft()){ raf = 0; return; }
+    if(sperre > 0) sperre -= dt;
+    if(laeuftDurch > 0){ laeuftDurch -= dt; if(laeuftDurch <= 0){ figur.classList.remove("drueben"); figur.classList.add("sofort"); void figur.offsetWidth; figur.classList.remove("sofort"); runde++; an = true; rest = dauer(); zeichne(); } }
+    else { rest -= dt; if(rest <= 0){ an = !an; rest = dauer(); zeichne(); } }
+    raf = requestAnimationFrame(schritt);
+  }
+  function los(){
+    if(!ctx.laeuft() || sperre > 0 || laeuftDurch > 0) return;
+    if(an){ sperre = 0.6; ctx.ton("falsch"); zeige("⚡ " + wuerfle(D.autsch || ["Zap! Wait for OFF."])); if(!ctx.reduziert){ figur.classList.add("zuckt"); setTimeout(() => figur.classList.remove("zuckt"), 500); } return; }
+    figur.classList.add("drueben"); laeuftDurch = ctx.reduziert ? 0.25 : 0.4; ctx.ton("richtig"); ctx.punkt();
+  }
+  const tipp = e => { e.preventDefault(); los(); };
+  const taste = e => { if(e.key === " " || e.key === "Enter" || e.key === "ArrowRight"){ e.preventDefault(); los(); } };
+  buehne.addEventListener("pointerdown", tipp); buehne.addEventListener("keydown", taste);
+  zeichne(); raf = requestAnimationFrame(schritt); setTimeout(() => { try { buehne.focus({ preventScroll: true }); } catch(e){} }, 50);
+  return () => { cancelAnimationFrame(raf); clearTimeout(mtimer); buehne.removeEventListener("pointerdown", tipp); buehne.removeEventListener("keydown", taste); buehne.removeAttribute("tabindex"); };
+}
+
+// Aussehen der beiden neuen Spiele (einmal einfügen)
+if(!document.getElementById("minispielStilNeu")){
+  const st = el("style"); st.id = "minispielStilNeu";
+  st.textContent = `
+  .ms-ck{display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding:3.3rem .6rem .7rem;box-sizing:border-box;gap:.3rem;touch-action:manipulation}
+  .ms-ck-legende{margin:0;font-size:.85rem;color:#cfd8ff;text-align:center}
+  .ms-ck-verlauf{display:flex;flex-direction:column;gap:.25rem;min-height:4.2rem;justify-content:flex-start}
+  .ms-ck-zeile{display:flex;gap:.4rem;justify-content:center}
+  .ms-ck-hinweis{min-width:3.2rem;text-align:center;background:#0b1736;border:3px solid #fff;border-radius:10px;padding:.15rem .3rem;font:700 1.15rem ui-monospace,Menlo,Consolas,monospace}
+  .ms-ck-reihe{display:flex;gap:.5rem}
+  .ms-ck-feld{width:3rem;height:3.4rem;display:flex;align-items:center;justify-content:center;background:#010d08;color:#ffd23f;border:4px dashed #ffd23f;border-radius:12px;font:700 1.8rem ui-monospace,Menlo,Consolas,monospace}
+  .ms-ck-feld.fest{border-style:solid;border-color:#fff;background:#0b3d2a;color:#fff}
+  .ms-ck-meldung{margin:0;min-height:1.4em;font-weight:700}
+  .ms-ck-tasten{display:flex;flex-wrap:wrap;gap:.45rem;justify-content:center;max-width:26rem}
+  .ms-ck-taste{min-width:3.3rem;min-height:3.3rem;font:700 1.5rem ui-monospace,Menlo,Consolas,monospace;background:#fff;color:#000;border:4px solid #000;border-radius:14px;box-shadow:0 4px 0 #000;cursor:pointer}
+  .ms-ck-taste.raus{background:#5b6478;color:#fff;text-decoration:line-through;border-style:dashed}
+  .ms-ck-taste.breit{min-width:4.6rem;background:#ffd23f}
+  .ms-lg{position:absolute;inset:0;background:linear-gradient(#0b1220 0 72%,#1c2738 72% 100%)}
+  .ms-lg-hinweis{position:absolute;left:0;right:0;top:3.3rem;margin:0;text-align:center;font-weight:700;color:#cfd8ff}
+  .ms-lg-figur{position:absolute;left:14%;bottom:26%;font-size:4rem;line-height:1;transform:translateX(-50%);transition:left .35s ease-in}
+  .ms-lg-figur.drueben{left:82%}
+  .ms-lg-figur.sofort{transition:none}
+  .ms-lg-figur.zuckt{animation:ms-lg-zuck .12s linear 4}
+  @keyframes ms-lg-zuck{50%{transform:translateX(-50%) rotate(-12deg)}}
+  .ms-lg-tor{position:absolute;left:86%;bottom:26%;font-size:4rem;line-height:1;transform:translateX(-50%)}
+  .ms-lg-strahl{position:absolute;left:50%;top:40%;bottom:26%;width:0;border-left:6px dashed #8a93a8;transform:translateX(-50%);opacity:.7}
+  .ms-lg-strahl.an{border-left:14px solid #ff4d6d;opacity:1;box-shadow:0 0 18px 6px rgba(255,77,109,.7)}
+  .ms-lg-schild{position:absolute;left:50%;top:38%;transform:translate(-50%,-100%);min-width:4.5rem;text-align:center;font:700 1.5rem ui-monospace,Menlo,Consolas,monospace;background:#fff;color:#000;border:4px dashed #000;border-radius:12px;padding:.1rem .6rem}
+  .ms-lg-schild.an{background:#000;color:#fff;border:4px solid #fff}
+  @media (prefers-reduced-motion: reduce){ .ms-lg-figur{transition:none} .ms-lg-figur.zuckt{animation:none} }`;
+  document.head.appendChild(st);
+}
+
+window.MINISPIELE = Object.freeze({ fuettern, taschenlampe, seeloewe, obstkorb, schaukel, nachtflug, rutsche, codeknacker, lasergitter });
 })();

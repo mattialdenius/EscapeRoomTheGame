@@ -141,3 +141,68 @@ K6.themen = [
   { id: "6-G18", klasse: 6, unit: 6, titel: "Die Zukunft mit going to: Fragen, Kurzantworten", regel: "" },
   { id: "6-G19", klasse: 6, unit: 6, titel: "Die Zukunft mit will (Wünsche, Hoffnungen, Vorhersagen)", regel: "" }
 ];
+
+// =====================================================================
+// 8) MINISPIELE
+//    Belohnung nach einem geschafften Zusatzraum: Knopf „🎁 Minispiel?“. Höchstens 30 Sekunden, zählt NICHT für den Code.
+//    Nur die Spiele, die unter „spiele“ stehen, werden in dieser Welt angeboten.
+//    titel / anleitung / erfolg = Texte; ziel = so viele Punkte braucht man. Die Spieltechnik steht in spiele/minispiele.js.
+// =====================================================================
+K6.minispiele = {
+  spiele: {
+    obstkorb: {
+      titel: "🪙 Schatzregen",
+      anleitung: "Der Sturm schüttelt die Schatzkisten! Schiebt den Korb mit dem Finger und fangt den Schatz auf. Vorsicht vor Bomben und Fischgräten!",
+      ziel: 12,
+      erfolg: "Der Korb ist voll! Käpt'n Grammar zählt schon nach."
+    },
+    nachtflug: {
+      titel: "🦜 Flug durch die Masten",
+      anleitung: "Tippt, damit der Bordpapagei flattert! Fliegt zwischen den Segeln hindurch und sammelt Goldmünzen 🪙. Anstoßen ist nicht schlimm.",
+      ziel: 8,
+      erfolg: "Acht Münzen im Schnabel! Der Käpt'n ist stolz."
+    },
+    rutsche: {
+      titel: "🐒 Schiffsaffe an Deck",
+      anleitung: "Tippt, damit der Schiffsaffe springt! Hüpft über Fässer und Kisten und schnappt euch die Bananen 🍌.",
+      ziel: 8,
+      erfolg: "Satt und zufrieden! Der Affe salutiert."
+    },
+    taschenlampe: {
+      titel: "🔦 Suche im Laderaum",
+      anleitung: "Im dunklen Laderaum ist einiges versteckt – manches hinter Kisten. Fahrt mit dem Finger herum und haltet das Licht kurz darauf!",
+      ziel: 6,
+      erfolg: "Alles gefunden! Ihr habt Augen wie ein Ausguck."
+    }
+  },
+
+  // ---------- Schatzregen (Technik: obstkorb) ----------
+  obst: [
+    { emoji: "🪙", en: "coin",     de: "Münze" },      { emoji: "💎", en: "diamond",  de: "Diamant" },
+    { emoji: "👑", en: "crown",    de: "Krone" },      { emoji: "💍", en: "ring",     de: "Ring" },
+    { emoji: "🗝️", en: "key",      de: "Schlüssel" },  { emoji: "🧭", en: "compass",  de: "Kompass" },
+    { emoji: "🏆", en: "cup",      de: "Pokal" },      { emoji: "📿", en: "necklace", de: "Kette" },
+    { emoji: "🔔", en: "bell",     de: "Glocke" },     { emoji: "🗺️", en: "map",      de: "Karte" }
+  ],
+  muell: ["💣", "🦴", "🥾", "🐟"],          // nicht fangen!
+  autsch: ["Autsch! Eine Bombe!", "Igitt, eine Fischgräte!", "Wer wirft denn Stiefel über Bord?!", "Das ist kein Schatz!"],
+
+  // ---------- Flug durch die Masten (Technik: nachtflug) ----------
+  flug: { figur: "🦜", stern: "🪙", krone: "⛵", himmel: ["☁️", "·", "✨", "🌙", "·", "☁️"] },
+  flugAutsch: ["Autsch! Ein Segel!", "Huch! Weiterflattern!", "Kraaah! Fast!", "Federn zerzaust – weiter!"],
+
+  // ---------- Schiffsaffe an Deck (Technik: rutsche) ----------
+  rutsche: { figur: "🐒", fisch: "🍌", hindernisse: ["🛢️", "📦", "⚓"], hintergrund: ["⛵", "☁️", "⛵", "☁️"] },
+  rutscheAutsch: ["Rumms! Weiter!", "Gegen das Fass! Weiter!", "Autsch!", "Hoppla – Kopf hoch!"],
+
+  // ---------- Suche im Laderaum (Technik: taschenlampe) ----------
+  nachtTiere: [
+    { emoji: "🐀", en: "rat",     de: "Ratte" },     { emoji: "🗝️", en: "key",    de: "Schlüssel" },
+    { emoji: "🧭", en: "compass", de: "Kompass" },   { emoji: "🪙", en: "coin",   de: "Münze" },
+    { emoji: "🦜", en: "parrot",  de: "Papagei" },   { emoji: "🐈", en: "cat",    de: "Katze" },
+    { emoji: "🕯️", en: "candle",  de: "Kerze" },     { emoji: "🗺️", en: "map",    de: "Karte" },
+    { emoji: "⚓", en: "anchor",  de: "Anker" },     { emoji: "🔔", en: "bell",   de: "Glocke" },
+    { emoji: "🦀", en: "crab",    de: "Krabbe" },    { emoji: "👑", en: "crown",  de: "Krone" }
+  ],
+  kulisse: ["📦", "🛢️", "📦", "🧺", "🛢️", "📦", "🪜", "🧺", "📦", "🛢️"]
+};

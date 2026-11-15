@@ -136,3 +136,38 @@ K8.themen = [
   { id: "8-G13", klasse: 8, unit: 5, titel: "Indirekte Rede (ohne Zeitverschiebung)", regel: "" },
   { id: "8-G14", klasse: 8, unit: 5, titel: "Indirekte Rede (mit Zeitverschiebung)", regel: "" }
 ];
+
+// =====================================================================
+// 8) MINISPIELE
+//    Reward after a cleared bonus room: button „🎁 Minispiel?“. 30 seconds at most, does NOT count for the code.
+//    Nur die Spiele, die unter „spiele“ stehen, werden in dieser Welt angeboten. Die Spieltechnik steht in spiele/minispiele.js.
+//    titel / anleitung / erfolg = Texte (einfaches Englisch); ziel = so viele Punkte braucht man.
+//    Beim Spiel codeknacker ist ziel zugleich die Länge des Codes (3 bis 5).
+// =====================================================================
+K8.minispiele = {
+  spiele: {
+    codeknacker: {
+      titel: "🔐 Crack the safe",
+      anleitung: "Find the four-digit code. Tap four digits. After each try you get a hint for every digit: ● right place, ◐ wrong place, ○ not in the code.",
+      ziel: 4,
+      erfolg: "Click. The safe is open. Morgan raises one eyebrow."
+    },
+    nachtflug: {
+      titel: "🕊️ Rooftop flight",
+      anleitung: "Tap to make the pigeon flap. Fly between the buildings and collect the clues 🔍. Bumping into things is fine.",
+      ziel: 8,
+      erfolg: "Eight clues. That pigeon deserves a badge."
+    },
+    rutsche: {
+      titel: "🏃 Night chase",
+      anleitung: "Tap to jump. Get over boxes and bins and pick up the clues 🔍.",
+      ziel: 8,
+      erfolg: "Eight clues and not one broken leg. Good run."
+    }
+  },
+  codeknacker: { ziffern: 5, legende: "● right place · ◐ wrong place · ○ not in the code", start: "Tap four digits.", fertig: "Code cracked." },
+  flug: { figur: "🕊️", stern: "🔍", krone: "🏢", himmel: ["🌧️", "·", "🌙", "·", "☁️", "·"] },
+  flugAutsch: ["Ouch. A chimney.", "Keep flapping.", "Close one.", "Feathers everywhere. Go on."],
+  rutsche: { figur: "🏃", fisch: "🔍", hindernisse: ["📦", "🗑️", "🚧"], hintergrund: ["🏢", "☁️", "🏢", "🌧️"] },
+  rutscheAutsch: ["Crash. Keep going.", "Mind the bins.", "Ouch.", "Up you get."]
+};
