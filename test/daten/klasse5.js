@@ -59,6 +59,7 @@ K5.welt = {
   // liegt in der Mitte des Hauses, die Tür ist unten in der Mitte.
   // -------------------------------------------------------------------
   karte: {
+    stil: "zoo",                            // Aussehen der Karte: Datei welt/stil-zoo.js
     groesse: { b: 1600, h: 1000 },          // Größe der ganzen Karte. Klein lassen: kurze Wege!
     start:   { x: 800, y: 860 },            // hier steht die Spielfigur am Anfang (vor dem Zootor)
 

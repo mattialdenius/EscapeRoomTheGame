@@ -1,42 +1,44 @@
 /* =====================================================================
-   ZOO-KARTE („Entdecker-Modus“) für den Grammar Escape Room
+   KARTEN-MOTOR („Entdecker-Modus“) für den Grammar Escape Room
    ---------------------------------------------------------------------
    Zweck:    Ersetzt die Übersicht mit den Kacheln durch eine begehbare
-             Karte. Die Kinder tippen auf die Karte, die Spielfigur läuft
-             hin, und am Gehege öffnet sich der gewohnte Aufgabenraum.
+             Karte. Man tippt auf die Karte, die Spielfigur läuft hin,
+             und am Raum öffnet sich der gewohnte Aufgabenraum.
              Die Karte zeichnet und steuert nur. Aufgaben, Zeit, Ziffern
              und Zahlenschloss bleiben in index.html (über EscapeAPI).
-   Version:  karte 0.3  (passt zu App-Version 0.6.2, Testbereich)
-   Daten:    Positionen und Texte stehen in daten/klasse5.js unter
-             K5.welt.karte. Hier im Code steht nichts Festes davon.
-   Speichert nichts: kein localStorage, keine Cookies, kein Netzwerk,
-             keine fremden Schriften oder Bilder. Alles wird gezeichnet.
-             Nach dem Neuladen der Seite ist alles wieder am Anfang.
+   Version:  karte 0.4  (passt zu App-Version 0.6.8, Testbereich)
+   Aufbau:   Diese Datei ist der gemeinsame MOTOR für alle Welten:
+             Kamera, Wegsuche, Eingabe, Figuren-Ablauf, Räume mit
+             Zuständen, Ausgang mit Code-Tafel, Einbettung.
+             Das AUSSEHEN einer Welt steht in einer eigenen Datei
+             welt/stil-<name>.js (zoo, agenten, schiff, museum,
+             detektiv, station). Welche Datei gilt, steht in den Daten:
+             KN.welt.karte.stil. Die Stil-Datei wird von hier selbst
+             nachgeladen, nur aus diesem Ordner. Fehlt sie, zeichnet der
+             Motor ein neutrales Aussehen.
+   Daten:    Positionen und Texte stehen in daten/klasseN.js unter
+             KN.welt.karte. Hier im Code steht nichts Festes davon.
+   Speichert nichts: kein localStorage, keine Cookies, kein Netzwerk
+             (außer dem Nachladen der eigenen Stil-Datei), keine fremden
+             Schriften oder Bilder. Alles wird gezeichnet.
 
    Änderungsliste:
-     0.3  (13.11.2026)  Wörter-Rucksack wieder entfernt (zu dominant, und man
-          konnte ein Tier einfach zehnmal antippen). Die Tiere am Weg
-          zeigen beim Antippen weiterhin ein Wort, möglichst nicht
-          zweimal hintereinander dasselbe.
-     0.2  (13.11.2026)  Nach dem ersten Klassentest: lebendigere Figuren.
-          Wörter-Rucksack (Tiere am Weg sammeln Wörter, Tiere machen
-          einen Trick), Nachtwächter ruft „Wer ist da?“, wenn sein Licht
-          die Spielfigur trifft (er fängt niemanden), Polly kommentiert
-          (Orte, Warten, Rückkehr aus einem Gehege, jedes geschaffte
-          Gehege), der Löwe reagiert aufs Antippen. Pfeil am Bildrand
-          ist antippbar. Der Rucksack wird nicht gespeichert.
-     0.1  (13.11.2026)  Erste Fassung: Zoo bei Nacht, vier Gehege,
-          Raubtierhaus (Kulisse), Zootor mit Code-Tafel, Polly,
-          Zoowärterin (Regelkarte), Nachtwächter (Zeitwarnung),
-          zwei Tiere am Wegrand (Wörter). Bedienung mit Finger, Maus,
-          Tastatur (Pfeile/WASD, Enter, Tab). Technik aus „Wunderwelt“
-          übernommen (Kamera, Wegsuche, Eingabe, Effekte, Töne),
-          Spielstand-Speicher und Vorlesestimme entfernt.
+     0.4  (15.11.2026)  Aus der Zoo-Karte wird ein Motor für alle Welten.
+          Zoo-Aussehen herausgelöst nach stil-zoo.js (sieht aus wie
+          vorher). Neu: Grundstil „neutral“, Stil-Dateien für Klasse 6–10,
+          Begleitfiguren, die am Boden mitlaufen, allgemeine Hindernisse,
+          Rollen-Namen für Figuren (begleiter, regel, zeit, wort).
+     0.3  (13.11.2026)  Wörter-Rucksack wieder entfernt. Die Tiere am Weg
+          zeigen ein Wort, möglichst nicht zweimal dasselbe.
+     0.2  (13.11.2026)  Lebendigere Figuren: Wächter ruft, Begleitfigur
+          kommentiert, Zusatzraum reagiert aufs Antippen, Pfeil am
+          Bildrand ist antippbar.
+     0.1  (13.11.2026)  Erste Fassung als Zoo-Karte.
 
    Aufbau dieser Datei:
      1. Hilfen und Zustand
      2. Karte aufbauen (Geometrie, Hindernisse, Wegsuche)
-     3. Zeichnen
+     3. Zeichnen (Hilfen, Stil-Verwaltung, Grundstil, Ablauf des Bildes)
      4. Ablauf (Bewegung, Figuren, Hinweise)
      5. Eingabe (Finger, Maus, Tastatur, Knopfliste für Screenreader)
      6. Einbettung (Container, zeigen/verbergen, Anmeldung bei EscapeAPI)
@@ -45,10 +47,12 @@
 'use strict';
 if (window.ZooKarte) return;
 const API = window.EscapeAPI;
-if (!API || typeof API.karteAnmelden !== 'function') { if (window.console) console.warn('Zoo-Karte: EscapeAPI fehlt – es bleibt bei der klassischen Übersicht.'); return; }
+if (!API || typeof API.karteAnmelden !== 'function') { if (window.console) console.warn('Karte: EscapeAPI fehlt – es bleibt bei der klassischen Übersicht.'); return; }
+// Ordner dieser Datei: Nur von hier werden die Stil-Dateien (stil-<name>.js) nachgeladen.
+const ORDNER = (() => { try { const src = document.currentScript && document.currentScript.src; return src ? src.replace(/[^\/]*$/, '') : 'welt/'; } catch (e) { return 'welt/'; } })();
 
 /* ============ 1. HILFEN UND ZUSTAND ============ */
-const VERSION = '0.3';
+const VERSION = '0.4';
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -63,24 +67,26 @@ const GESCHW = 340;          // Lauftempo der Spielfigur (Karten-Einheiten pro S
 const MAX_LAUFZEIT = 4.5;    // kein Lauf dauert länger (Sekunden) – lange Wege werden schneller gelaufen
 const ZELLE = 20;            // Rastergröße der Wegsuche
 
-// Ersatztexte, falls in den Daten ein Text fehlt
+// Ersatztexte, falls weder der Stil noch die Daten einen Text mitbringen (neutral, ohne Welt-Wörter)
 const TEXTE = {
-  gesperrt: 'Dieses Gehege ist noch zu. Schafft zuerst das Gehege mit dem Pfeil!',
+  gesperrt: 'Dieser Raum ist noch zu. Schafft zuerst den Raum mit dem Pfeil!',
   schonGeschafft: 'Hier habt ihr die Ziffer schon gefunden. Weiter geht’s!',
-  torZu: 'Erst alle vier Gehege schaffen!',
-  loewe: 'Psst! Der Löwe schläft.',
-  jubel: 'Kraaah! Eine neue Ziffer!',
+  torZu: 'Erst alle vier Räume schaffen!',
+  zusatz: '',
+  zusatzKurz: '',
+  zusatzReaktion: [],
+  jubel: 'Eine neue Ziffer!',
   tipp: 'Als Nächstes: {name}! Folgt dem Pfeil.',
-  tippTor: 'Alle Ziffern gefunden! Lauft zum Zootor.',
+  tippTor: 'Alle Ziffern gefunden! Auf zum Ausgang.',
   regelTitel: 'Regel für: {name}',
-  keineRegel: 'Für dieses Gehege gibt es keine Regelkarte.',
-  waerterinFertig: 'Alles geschafft! Jetzt schnell zum Zootor.',
+  keineRegel: 'Für diesen Raum gibt es keine Regelkarte.',
+  waerterinFertig: 'Alles geschafft! Jetzt schnell zum Ausgang.',
   waechter: 'Beeilt euch!',
-  waechterRuf: ['Wer ist da?', 'Halt! … Ach, ihr seid es.', 'Nanu? Schon so spät!'],
-  loeweSchnarcht: ['Chrrr … chrrr …', 'Chrrr … *blinzel* … chrrr', 'Grrr-mpf … zzz'],
-  pollyGeschafft: ['Kraaah! Die erste Ziffer!', 'Halbzeit! Zwei Ziffern!', 'Nur noch ein Gehege!', 'Alle vier! Auf zum Zootor!'],
-  pollyWarten: ['Kommt, weiter geht’s: {name}!', 'Wo bleibt ihr? Ich fliege schon mal vor!'],
-  pollyZurueck: ['Nicht aufgeben! Gleich noch einmal.', 'Kurze Pause? Dann wieder rein!']
+  waechterRuf: ['Wer ist da?'],
+  pollyGeschafft: [],
+  pollyWarten: ['Weiter geht’s: {name}!'],
+  pollyZurueck: ['Nicht aufgeben! Gleich noch einmal.'],
+  schliessen: 'Schließen'
 };
 const wahl = t => Array.isArray(t) ? (t.length ? t[Math.floor(Math.random() * t.length)] : '') : String(t || '');
 
@@ -90,10 +96,11 @@ const Z = {
   W: 1600, H: 1000, w: 300, h: 300, dpr: 1, scale: 1, cam: { x: 0, y: 0 },
   status: null, sig: '', pollT: 0, neueMission: true, gewarnt: false, jubel: -1,
   P: null, polly: null, figs: [], G: [], raub: null, tor: null, brunnen: null, tafel: null,
-  baeume: [], lampen: [], wege: [], flecken: [], sterne: [],
+  baeume: [], lampen: [], wege: [], flecken: [], sterne: [], hind: [], deko: [],
   blasen: [], fx: [], marker: null, randPfeil: null, letztesWort: '', orte: [], ruhe: 0, sagBald: null, loeweNr: 0, fokus: null, zeiger: null, tasten: new Set(), ruhig: false
 };
 let box = null, canvas = null, ctx = null, srListe = null, srLive = null, regelBox = null, angemeldet = false;
+let S = null;   // der Stil (das Aussehen) der aktuellen Welt
 
 /* ---- Töne: nur wenn in der App der Ton eingeschaltet ist (Knopf oben rechts) ---- */
 const Sfx = {
@@ -116,12 +123,13 @@ const Sfx = {
     else if (name === 'plopp') this.ton(420, 0.12, { to: 840, type: 'sine' });
     else if (name === 'huch') { this.ton(520, 0.09, { type: 'square', vol: 0.06 }); this.ton(780, 0.14, { type: 'square', vol: 0.06, at: 0.1 }); }
     else if (name === 'schnarch') { this.ton(110, 0.5, { to: 70, type: 'sawtooth', vol: 0.08 }); this.ton(180, 0.3, { to: 240, type: 'sine', vol: 0.05, at: 0.55 }); }
+    else if (name === 'summ') { this.ton(220, 0.25, { to: 330, type: 'sawtooth', vol: 0.05 }); }
     else if (name === 'jubel') [523, 659, 784, 1047].forEach((f, i) => this.ton(f, 0.18, { at: i * 0.09 }));
   }
 };
 
 // Die App zeigt bei jedem unbehandelten Fehler eine Fehlermeldung. Deshalb fängt die Karte ihre Fehler selbst ab.
-function sicher(fn) { return function (e) { try { return fn.call(this, e); } catch (err) { if (window.console) console.error('Zoo-Karte', err); } }; }
+function sicher(fn) { return function (e) { try { return fn.call(this, e); } catch (err) { if (window.console) console.error('Karte', err); } }; }
 function hoere(ziel, name, fn) { ziel.addEventListener(name, sicher(fn)); }
 function sage(text) { try { API.sage(text); } catch (e) {} }
 function ansage(text) { if (srLive) { srLive.textContent = ''; srLive.textContent = text; } }
@@ -141,84 +149,63 @@ function funken(x, y, n, o) {
 /* ============ 2. KARTE AUFBAUEN ============ */
 function zahl(v, ersatz) { return typeof v === 'number' && isFinite(v) ? v : ersatz; }
 
+// Welche Rolle hat eine Figur? (alte Zoo-Namen und neue, allgemeine Namen)
+const ROLLE = { polly: 'begleiter', begleiter: 'begleiter', waerterin: 'waerterin', regel: 'waerterin', waechter: 'waechter', zeit: 'waechter', tier: 'tier', wort: 'tier' };
+const stilName = D => (D && typeof D.stil === 'string' && D.stil) || (D && D.gehege ? 'zoo' : '');
+
 function baue(welt) {
-  const D = welt.karte, R = seeded(20261113);
+  const D = welt.karte;
+  S = stilFuer(stilName(D));
   const W = Z.W = clamp(zahl(D.groesse && D.groesse.b, 1600), 800, 3000), H = Z.H = clamp(zahl(D.groesse && D.groesse.h, 1000), 600, 2400);
-  Z.texte = Object.assign({}, TEXTE, D.texte || {});
-  // Gehege (Reihenfolge = Raum 0 … 3)
+  Z.texte = Object.assign({}, TEXTE, S.texte || {}, D.texte || {});
+  const M = S.masse, rd = D.raeume || D.gehege || [];
+  // Räume (Reihenfolge = Raum 0 … 3)
   Z.G = welt.raeume.map((r, i) => {
-    const d = (D.gehege && D.gehege[i]) || {}, x = zahl(d.x, i % 2 ? W - 300 : 300), y = zahl(d.y, i < 2 ? 300 : H - 300);
-    return { nr: i, x, y, schild: d.schild || r.name, emoji: r.emoji, rect: { x0: x - 130, y0: y - 110, x1: x + 130, y1: y + 40 }, spot: { x, y: y + 74 }, wackel: 0 };
+    const d = rd[i] || {}, x = zahl(d.x, i % 2 ? W - 300 : 300), y = zahl(d.y, i < 2 ? 300 : H - 300);
+    return { nr: i, x, y, schild: d.schild || r.name, emoji: r.emoji, rect: { x0: x - M.raum.l, y0: y - M.raum.o, x1: x + M.raum.l, y1: y + M.raum.u }, spot: { x, y: y + M.raum.spot }, wackel: 0 };
   });
   const tx = zahl(D.tor && D.tor.x, W / 2), ty = clamp(zahl(D.tor && D.tor.y, H - 50), H - 80, H - 30);
   Z.tor = { x: tx, y: ty, name: welt.ausgang.name, emoji: welt.ausgang.emoji, spot: { x: tx, y: ty - 48 }, wackel: 0 };
-  Z.tafel = { x: tx + 160, y: ty - 62 };
-  const rb = D.raubtierhaus || {}, rx = zahl(rb.x, W / 2), ry = zahl(rb.y, 200);
-  Z.raub = { x: rx, y: ry, name: rb.schild || welt.zusatzraum.name, emoji: welt.zusatzraum.emoji, rect: { x0: rx - 150, y0: ry - 110, x1: rx + 150, y1: ry + 40 }, spot: { x: rx, y: ry + 74 }, wach: 0, wackel: 0 };
-  const br = D.brunnen || {};
-  Z.brunnen = { x: zahl(br.x, W / 2), y: zahl(br.y, H * 0.6), rx: 78, ry: 54 };
+  Z.tafel = { x: tx + M.tafel.dx, y: ty + M.tafel.dy };
+  const rb = D.zusatzraum || D.raubtierhaus || {}, rx = zahl(rb.x, W / 2), ry = zahl(rb.y, 200);
+  Z.raub = { x: rx, y: ry, name: rb.schild || welt.zusatzraum.name, emoji: welt.zusatzraum.emoji, rect: { x0: rx - M.zusatz.l, y0: ry - M.zusatz.o, x1: rx + M.zusatz.l, y1: ry + M.zusatz.u }, spot: { x: rx, y: ry + M.zusatz.spot }, wach: 0, wackel: 0 };
   Z.start = { x: zahl(D.start && D.start.x, tx), y: zahl(D.start && D.start.y, ty - 90) };
-
-  // Wege (nur gemalt – laufen darf man überall, wo nichts steht)
-  Z.wege = [[[tx, ty], [tx, Z.brunnen.y + 96]], [[tx, Z.brunnen.y - 96], [rx, Z.raub.spot.y - 10]]];
-  for (const g of Z.G) Z.wege.push([[g.spot.x, g.spot.y - 14], [g.spot.x, g.spot.y + 28], [tx, g.spot.y + 28]]);
+  Z.wege = []; Z.lampen = []; Z.baeume = []; Z.flecken = []; Z.sterne = []; Z.hind = []; Z.deko = []; Z.brunnen = null;
 
   // Figuren (höchstens 5, keine hält auf)
   Z.figs = []; let hatPolly = false;
   (Array.isArray(D.figuren) ? D.figuren : []).slice(0, 5).forEach((f, i) => {
-    if (!f) return;
-    if (f.art === 'polly') { hatPolly = true; return; }
-    if (f.art === 'waechter') {
+    if (!f) return; const art = ROLLE[f.art]; if (!art) return;
+    if (art === 'begleiter') { hatPolly = true; return; }
+    if (art === 'waechter') {
       const runde = (Array.isArray(f.runde) ? f.runde : []).filter(p => Array.isArray(p) && p.length >= 2).map(p => ({ x: +p[0], y: +p[1] }));
-      if (runde.length) Z.figs.push({ id: 'waechter', art: 'waechter', name: f.name || 'Nachtwächter', runde, x: runde[0].x, y: runde[0].y, ziel: 1 % runde.length, blick: 1, winkel: 0, kegel: 0, pause: 0, ruhe: 3, hop: 0 });
-    } else if (f.art === 'waerterin') Z.figs.push({ id: 'waerterin', art: 'waerterin', name: f.name || 'Zoowärterin', x: zahl(f.x, tx - 110), y: zahl(f.y, H / 2), hop: 0 });
-    else if (f.art === 'tier') Z.figs.push({ id: 'tier' + i, art: 'tier', name: f.name || 'Tier', emoji: f.emoji || '🦉', trick: f.trick || 'huepfen', trickT: 0, x: zahl(f.x, 200 + i * 200), y: zahl(f.y, H / 2), hop: 0 });
+      if (runde.length) Z.figs.push({ id: 'waechter', art, aussehen: f.aussehen || '', name: f.name || 'Wache', runde, x: runde[0].x, y: runde[0].y, ziel: 1 % runde.length, blick: 1, winkel: 0, kegel: 0, pause: 0, ruhe: 3, hop: 0 });
+    } else if (art === 'waerterin') Z.figs.push({ id: 'waerterin', art, aussehen: f.aussehen || '', name: f.name || 'Hilfe', x: zahl(f.x, tx - 110), y: zahl(f.y, H / 2), hop: 0 });
+    else Z.figs.push({ id: 'tier' + i, art, aussehen: f.aussehen || '', name: f.name || 'Figur', emoji: f.emoji || '💬', trick: f.trick || 'huepfen', trickT: 0, x: zahl(f.x, 200 + i * 200), y: zahl(f.y, H / 2), hop: 0 });
   });
   Z.hatPolly = hatPolly || !Array.isArray(D.figuren);
   Z.orte = (Array.isArray(D.orte) ? D.orte : []).filter(o => o && o.text).map(o => ({ x: zahl(o.x, 0), y: zahl(o.y, 0), r: zahl(o.radius, 120), text: o.text, gesagt: false }));
 
-  // Laternen
-  Z.lampen = [];
-  for (const g of Z.G) Z.lampen.push({ x: g.spot.x - 152, y: g.spot.y - 20 }, { x: g.spot.x + 152, y: g.spot.y - 20 });
-  Z.lampen.push({ x: tx - 120, y: ty - 40 }, { x: tx + 260, y: ty - 40 }, { x: rx - 185, y: ry + 62 }, { x: rx + 185, y: ry + 62 },
-    { x: Z.brunnen.x - 130, y: Z.brunnen.y + 20 }, { x: Z.brunnen.x + 130, y: Z.brunnen.y + 20 });
-
-  // Bäume und Büsche (fester Zufall: sieht jedes Mal gleich aus)
-  Z.baeume = [];
-  const wegAbstand = (x, y) => { let m = 1e9; for (const P of Z.wege) for (let i = 0; i < P.length - 1; i++) m = Math.min(m, segDist(x, y, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1])); return m; };
-  const imRect = (r, x, y, p) => x > r.x0 - p && x < r.x1 + p && y > r.y0 - p && y < r.y1 + p;
-  const platzFrei = (x, y) => {
-    if (x < 90 || x > W - 90 || y < 150 || y > H - 120) return false;
-    if (wegAbstand(x, y) < 72) return false;
-    for (const g of Z.G) if (imRect(g.rect, x, y, 60) || dist(x, y, g.spot.x, g.spot.y) < 120 || (Math.abs(x - g.x) < 170 && y < g.rect.y0 && y > g.rect.y0 - 110)) return false;
-    if (imRect(Z.raub.rect, x, y, 70) || dist(x, y, Z.brunnen.x, Z.brunnen.y) < 170 || dist(x, y, Z.start.x, Z.start.y) < 120 || dist(x, y, Z.tafel.x, Z.tafel.y) < 110) return false;
-    for (const f of Z.figs) { if (f.runde) { for (let i = 0; i < f.runde.length; i++) { const a = f.runde[i], b = f.runde[(i + 1) % f.runde.length]; if (segDist(x, y, a.x, a.y, b.x, b.y) < 60) return false; } } else if (dist(x, y, f.x, f.y) < 100) return false; }
-    for (const b of Z.baeume) if (dist(x, y, b.x, b.y) < 95) return false;
-    return true;
-  };
-  for (let i = 0, n = 0; i < 700 && n < 22; i++) { const x = R() * W, y = R() * H; if (platzFrei(x, y)) { Z.baeume.push({ x, y, s: 0.85 + R() * 0.35, art: R() < 0.35 ? 1 : 0 }); n++; } }
-  Z.flecken = []; for (let i = 0; i < 34; i++) Z.flecken.push({ x: R() * W, y: 100 + R() * (H - 160), rx: 60 + R() * 120, ry: 26 + R() * 46, hell: R() < 0.5 });
-  Z.sterne = []; for (let i = 0; i < 46; i++) Z.sterne.push({ x: R() * W, y: 6 + R() * 52, r: 1 + R() * 1.6, ph: R() * 6 });
+  // Wege, Lampen, Dekoration und Hindernisse: Das macht der Stil der Welt
+  S.bau(welt, D);
 
   // Lauf-Raster für die Wegsuche
   Z.cols = Math.ceil(W / ZELLE); Z.rows = Math.ceil(H / ZELLE);
   Z.grid = new Uint8Array(Z.cols * Z.rows);
   for (let j = 0; j < Z.rows; j++) for (let i = 0; i < Z.cols; i++) Z.grid[j * Z.cols + i] = festAn((i + 0.5) * ZELLE, (j + 0.5) * ZELLE) ? 1 : 0;
   Z.gs = new Float32Array(Z.grid.length); Z.came = new Int32Array(Z.grid.length); Z.st = new Uint8Array(Z.grid.length);
-  Z.gebaut = welt.klasse + '|' + welt.name;
 }
 function segDist(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy; const t = l ? clamp(((px - ax) * dx + (py - ay) * dy) / l, 0, 1) : 0; return Math.hypot(px - ax - dx * t, py - ay - dy * t); }
 
-// Wo kann man NICHT laufen? (Mauern, Häuser, Brunnen, Bäume, Tafel)
+// Wo kann man NICHT laufen? (Ränder, Räume, Zusatzraum, Tafel, Hindernisse des Stils)
 function festAn(x, y) {
-  const p = 16;
-  if (x < 56 || x > Z.W - 56 || y < 98 || y > Z.tor.y - 26) return true;
+  const p = 16, R = S.masse.grenzen;
+  if (x < R.l || x > Z.W - R.r || y < R.o || y > Z.tor.y - R.u) return true;
   for (const g of Z.G) if (x > g.rect.x0 - p && x < g.rect.x1 + p && y > g.rect.y0 - p && y < g.rect.y1 + p) return true;
   const r = Z.raub.rect; if (x > r.x0 - p && x < r.x1 + p && y > r.y0 - p && y < r.y1 + p) return true;
-  const b = Z.brunnen, ex = (x - b.x) / (b.rx + p), ey = (y - b.y) / (b.ry + p); if (ex * ex + ey * ey < 1) return true;
   if (Math.abs(x - Z.tafel.x) < 62 && Math.abs(y - Z.tafel.y + 8) < 26) return true;
-  for (const t of Z.baeume) if (Math.abs(x - t.x) < 28 && Math.abs(y - t.y) < 28 && dist(x, y, t.x, t.y - 4) < 26) return true;
-  return false;
+  for (const h of Z.hind) { if (h.r != null) { if (dist(x, y, h.x, h.y) < h.r + p) return true; } else if (x > h.x0 - p && x < h.x1 + p && y > h.y0 - p && y < h.y1 + p) return true; }
+  return !!S.fest(x, y, p);
 }
 function frei(x, y) { const i = Math.floor(x / ZELLE), j = Math.floor(y / ZELLE); return i >= 0 && j >= 0 && i < Z.cols && j < Z.rows && !Z.grid[j * Z.cols + i]; }
 function naheFrei(x, y) {
@@ -295,94 +282,7 @@ const WORT = { gesperrt: 'gesperrt', offen: 'offen', begonnen: 'begonnen', gesch
 function raumStatus(i) { const s = Z.status && Z.status.raeume && Z.status.raeume[i]; return s || { nr: i, zustand: 'gesperrt', richtig: 0, von: 0, ziffer: null, kandidaten: null }; }
 function naechstes() { if (!Z.status) return -1; for (const r of Z.status.raeume) if (r.zustand === 'offen' || r.zustand === 'begonnen') return r.nr; return -1; }
 
-function zeichneBoden(c, t) {
-  const W = Z.W, H = Z.H, tor = Z.tor;
-  c.fillStyle = '#12304a'; c.fillRect(0, 0, W, H);
-  for (const p of Z.flecken) { c.fillStyle = p.hell ? 'rgba(60,120,130,0.20)' : 'rgba(5,15,40,0.22)'; ell(c, p.x, p.y, p.rx, p.ry); c.fill(); }
-  // Nachthimmel hinter der Mauer
-  const g = c.createLinearGradient(0, 0, 0, 70); g.addColorStop(0, '#050b1c'); g.addColorStop(1, '#13285e'); c.fillStyle = g; c.fillRect(0, 0, W, 70);
-  c.fillStyle = '#fff'; for (const s of Z.sterne) { c.globalAlpha = 0.5 + 0.5 * puls(t + s.ph, 1.5); circ(c, s.x, s.y, s.r); c.fill(); } c.globalAlpha = 1;
-  c.fillStyle = '#fff8d6'; circ(c, W - 150, 34, 22); c.fill(); c.fillStyle = '#0b1a40'; circ(c, W - 140, 28, 20); c.fill();
-  // Wege
-  c.lineCap = 'round'; c.lineJoin = 'round';
-  for (const pass of [0, 1]) {
-    c.strokeStyle = pass ? '#55628c' : '#2a3558'; c.lineWidth = pass ? 54 : 66;
-    for (const P of Z.wege) { c.beginPath(); c.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) c.lineTo(P[i][0], P[i][1]); c.stroke(); }
-    const b = Z.brunnen; c.lineWidth = pass ? 40 : 52; ell(c, b.x, b.y, b.rx + 44, b.ry + 40); c.stroke();
-  }
-  c.fillStyle = 'rgba(255,255,255,0.10)'; for (const P of Z.wege) for (let i = 0; i < P.length - 1; i++) { const n = Math.floor(dist(P[i][0], P[i][1], P[i + 1][0], P[i + 1][1]) / 46); for (let k = 1; k < n; k++) { circ(c, lerp(P[i][0], P[i + 1][0], k / n) + ((k * 37) % 30 - 15), lerp(P[i][1], P[i + 1][1], k / n) + ((k * 53) % 28 - 14), 4); c.fill(); } }
-  // Mauern (oben, links, rechts, unten mit Tor-Öffnung)
-  c.fillStyle = '#26345e'; c.strokeStyle = '#000'; c.lineWidth = 4;
-  c.fillRect(0, 62, W, 26); c.strokeRect(-4, 62, W + 8, 26);
-  c.fillRect(0, 62, 30, H); c.fillRect(W - 30, 62, 30, H);
-  c.fillRect(0, tor.y - 8, tor.x - 78, H); c.strokeRect(-4, tor.y - 8, tor.x - 74, H);
-  c.fillRect(tor.x + 78, tor.y - 8, W, H); c.strokeRect(tor.x + 78, tor.y - 8, W, H);
-  c.fillStyle = '#1a4a4f'; for (let x = 20; x < W; x += 62) { circ(c, x + (x * 7) % 20, 66, 24 + (x * 13) % 10); c.fill(); }
-  c.fillStyle = '#55628c'; c.fillRect(tor.x - 74, tor.y - 8, 148, H);
-}
-function zeichneLicht(c, t) {
-  c.save(); c.globalCompositeOperation = 'lighter';
-  for (const l of Z.lampen) { const r = 150 + 6 * puls(t + l.x, 2.3); const g = c.createRadialGradient(l.x, l.y, 0, l.x, l.y, r); g.addColorStop(0, 'rgba(255,205,110,0.30)'); g.addColorStop(1, 'rgba(255,205,110,0)'); c.fillStyle = g; c.fillRect(l.x - r, l.y - r, r * 2, r * 2); }
-  // Taschenlampe der Spielfigur
-  const P = Z.P; c.translate(P.x, P.y - 8); c.rotate(P.winkel);
-  const g2 = c.createRadialGradient(0, 0, 10, 0, 0, 210); g2.addColorStop(0, 'rgba(255,245,200,0.34)'); g2.addColorStop(1, 'rgba(255,245,200,0)');
-  c.fillStyle = g2; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 210, -0.42, 0.42); c.closePath(); c.fill();
-  c.restore();
-}
-
-function zeichneGehege(c, g, t) {
-  const st = raumStatus(g.nr), z = st.zustand, zu = z === 'gesperrt', fertig = z === 'geschafft' || z === 'unsicher';
-  const farben = ['#7b5230', '#2f6c96', '#3f7550', '#6a6790'], x = g.x + (g.wackel > 0 ? Math.sin(g.wackel * 40) * 5 * g.wackel : 0), y = g.y;
-  c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, x, y + 40, 140, 16); c.fill();
-  rr(c, x - 130, y - 110, 260, 150, 16); fs(c, farben[g.nr % 4], '#000', 4);
-  if (zu) { c.fillStyle = 'rgba(5,11,28,0.5)'; rr(c, x - 130, y - 110, 260, 150, 16); c.fill(); }
-  rr(c, x - 140, y - 124, 280, 36, 14); fs(c, '#1b2646', '#000', 4);
-  c.fillStyle = 'rgba(255,255,255,0.14)'; for (let i = 0; i < 7; i++) c.fillRect(x - 124 + i * 38, y - 118, 20, 8);
-  // Fenster links: das Tier
-  circ(c, x - 84, y - 38, 34); fs(c, zu ? '#22314f' : '#fff3c4', '#000', 4);
-  c.globalAlpha = zu ? 0.5 : 1; emoji(c, g.emoji, x - 84, y - 36, 42); c.globalAlpha = 1;
-  // Fenster rechts: Zustand als Form
-  circ(c, x + 84, y - 38, 30); fs(c, '#0b1736', '#000', 4);
-  symbol(c, SYMBOL[z] || 'schloss', x + 84, y - 38, 20);
-  // Tür in der Mitte
-  c.beginPath(); c.moveTo(x - 30, y + 40); c.lineTo(x - 30, y - 30); c.arc(x, y - 30, 30, Math.PI, 0); c.lineTo(x + 30, y + 40); c.closePath();
-  fs(c, zu ? '#141d38' : fertig ? '#2a3b63' : '#ffd23f', '#000', 4);
-  if (zu) { c.strokeStyle = '#9aa6c8'; c.lineWidth = 4; for (let i = -20; i <= 20; i += 10) { c.beginPath(); c.moveTo(x + i, y - 30 - Math.sqrt(900 - i * i) + 3); c.lineTo(x + i, y + 38); c.stroke(); } c.beginPath(); c.moveTo(x - 28, y - 4); c.lineTo(x + 28, y - 4); c.stroke(); }
-  else if (!fertig) { c.fillStyle = 'rgba(255,255,255,0.55)'; c.beginPath(); c.moveTo(x - 16, y + 36); c.lineTo(x - 16, y - 28); c.arc(x - 2, y - 28, 14, Math.PI, Math.PI * 1.5); c.lineTo(x - 2, y + 36); c.closePath(); c.fill(); }
-  else { c.fillStyle = '#000'; circ(c, x + 16, y + 6, 4); c.fill(); }
-}
-function zeichneRaub(c, r, t) {
-  const wach = r.wach > 0, x = r.x + (r.wackel > 0 && !Z.ruhig ? Math.sin(r.wackel * 40) * 4 * r.wackel : 0), y = r.y;
-  c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, x, y + 40, 160, 18); c.fill();
-  rr(c, x - 150, y - 110, 300, 150, 16); fs(c, '#5b3140', '#000', 4);
-  rr(c, x - 160, y - 124, 320, 36, 14); fs(c, '#1b2646', '#000', 4);
-  rr(c, x - 110, y - 70, 220, 92, 12); fs(c, '#161f3c', '#000', 4);
-  emoji(c, r.emoji, x - 10, y - 20, wach && !Z.ruhig ? 62 + Math.sin(r.wach * 9) * 7 : 62);
-  c.strokeStyle = '#9aa6c8'; c.lineWidth = 5; for (let i = -88; i <= 88; i += 22) { c.beginPath(); c.moveTo(x + i, y - 68); c.lineTo(x + i, y + 20); c.stroke(); }
-  c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  for (let i = 0; i < 3; i++) { const u = Z.ruhig ? 0.5 : (t * (r.wach > 0 ? 1.3 : 0.4) + i / 3) % 1; c.globalAlpha = 1 - u * 0.8; c.font = 'bold ' + (16 + i * 5) * (wach ? 1.5 : 1) + 'px ' + TEXT_FONT; c.fillText(wach ? 'Z' : 'z', x + 44 + i * 20, y - 30 - i * 16 - u * 10); } c.globalAlpha = 1;
-}
-function zeichneBrunnen(c, b, t) {
-  c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, b.x, b.y + 10, b.rx + 8, b.ry + 6); c.fill();
-  ell(c, b.x, b.y, b.rx, b.ry); fs(c, '#7d87a8', '#000', 4);
-  ell(c, b.x, b.y - 2, b.rx - 14, b.ry - 12); fs(c, '#1d4f86', '#000', 3);
-  c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 3; c.beginPath(); c.arc(b.x - 20, b.y + (Z.ruhig ? 0 : Math.sin(t * 1.5) * 2), 14, Math.PI * 1.1, Math.PI * 1.7); c.stroke();
-  c.fillStyle = '#fff8d6'; circ(c, b.x + 22, b.y - 8, 9); c.fill(); c.fillStyle = '#1d4f86'; circ(c, b.x + 26, b.y - 11, 8); c.fill();
-}
-function zeichneBaum(c, b, alpha) {
-  c.fillStyle = 'rgba(0,0,0,0.28)'; ell(c, b.x, b.y, 30 * b.s, 9 * b.s); c.fill();
-  c.save(); c.translate(b.x, b.y); c.scale(b.s, b.s);
-  if (b.art === 1) { c.globalAlpha = alpha; c.fillStyle = '#1e5a55'; circ(c, -16, -12, 17); c.fill(); circ(c, 16, -12, 17); c.fill(); c.fillStyle = '#2a7268'; circ(c, 0, -22, 22); c.fill(); c.strokeStyle = '#000'; c.lineWidth = 2.5; c.beginPath(); c.arc(0, -22, 22, Math.PI * 1.05, Math.PI * 1.95); c.stroke(); }
-  else { rr(c, -8, -40, 16, 42, 5); fs(c, '#5a4636', '#000', 2.5); c.globalAlpha = alpha; c.fillStyle = '#1a4f52'; circ(c, -22, -56, 25); c.fill(); circ(c, 22, -56, 25); c.fill(); c.fillStyle = '#236660'; circ(c, 0, -76, 35); c.fill(); c.fillStyle = '#2f7d70'; circ(c, -10, -86, 12); c.fill(); c.strokeStyle = '#000'; c.lineWidth = 3; c.beginPath(); c.arc(0, -76, 35, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); }
-  c.restore();
-}
-function zeichneLampe(c, l, t) {
-  c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, l.x, l.y, 10, 4); c.fill();
-  c.fillStyle = '#000'; c.fillRect(l.x - 3.5, l.y - 62, 7, 62);
-  c.fillStyle = 'rgba(255,214,120,0.35)'; circ(c, l.x, l.y - 70, 22 + 2 * puls(t + l.x, 2.3)); c.fill();
-  rr(c, l.x - 11, l.y - 84, 22, 26, 6); fs(c, '#ffe7a3', '#000', 3);
-}
-/* Menschen: Füße bei (0,0). o: jacke, hose, haut, hut ('muetze'|'hut'|'kappe'), rucksack, lampe, brett, gehen, groesse */
+/* Menschen: Füße bei (0,0). o: jacke, hose, haut, hut ('muetze'|'hut'|'kappe'|'dreispitz'|'bandana'|'fedora'|'helm'|'haare'|'headset'|'kochmuetze'), hutFarbe, mantel, rucksack, lampe, brett, gehen, groesse */
 function zeichnePerson(c, x, y, t, o) {
   const s = o.groesse || 1, w = o.gehen && !Z.ruhig ? Math.sin(t * 14) : 0, lift = o.hop > 0 ? Math.sin((1 - clamp(o.hop, 0, 1)) * Math.PI) * 16 : 0;
   c.fillStyle = 'rgba(0,0,0,0.32)'; ell(c, x, y, 20 * s, 7 * s); c.fill();
@@ -390,7 +290,7 @@ function zeichnePerson(c, x, y, t, o) {
   if (o.rucksack) { rr(c, -19, -46, 16, 26, 6); fs(c, '#2b59c3', '#000', 2.5); }
   c.strokeStyle = '#000'; c.lineWidth = 10; c.beginPath(); c.moveTo(-6, -20); c.lineTo(-6 + w * 5, -3); c.moveTo(6, -20); c.lineTo(6 - w * 5, -3); c.stroke();
   c.strokeStyle = o.hose; c.lineWidth = 6; c.beginPath(); c.moveTo(-6, -20); c.lineTo(-6 + w * 5, -4); c.moveTo(6, -20); c.lineTo(6 - w * 5, -4); c.stroke();
-  rr(c, -13, -50, 26, 32, 9); fs(c, o.jacke, '#000', 2.5);
+  if (o.mantel) { rr(c, -15, -50, 30, 44, 9); fs(c, o.jacke, '#000', 2.5); c.strokeStyle = '#000'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(2, -48); c.lineTo(2, -8); c.stroke(); } else { rr(c, -13, -50, 26, 32, 9); fs(c, o.jacke, '#000', 2.5); }
   if (o.streifen) { c.fillStyle = o.streifen; c.fillRect(-12, -36, 24, 5); }
   // Arm mit Taschenlampe oder Klemmbrett
   c.strokeStyle = '#000'; c.lineWidth = 9; c.beginPath(); c.moveTo(8, -44); c.lineTo(20, -32 + w * 2); c.stroke();
@@ -403,30 +303,26 @@ function zeichnePerson(c, x, y, t, o) {
   if (o.hut === 'muetze') { c.beginPath(); c.arc(0, -64, 13.5, Math.PI, 0); c.closePath(); fs(c, '#3ddc97', '#000', 2.5); circ(c, 0, -79, 4); fs(c, '#fff', '#000', 2); }
   else if (o.hut === 'hut') { rr(c, -19, -70, 38, 6, 3); fs(c, '#c9a45c', '#000', 2.5); c.beginPath(); c.arc(0, -70, 11, Math.PI, 0); c.closePath(); fs(c, '#c9a45c', '#000', 2.5); }
   else if (o.hut === 'kappe') { c.beginPath(); c.arc(0, -66, 13.5, Math.PI, 0); c.closePath(); fs(c, '#1b2646', '#000', 2.5); rr(c, 2, -69, 18, 5, 2); fs(c, '#1b2646', '#000', 2); c.fillStyle = '#ffd23f'; circ(c, 3, -72, 2.5); c.fill(); }
+  else if (o.hut === 'dreispitz') { c.beginPath(); c.moveTo(-21, -68); c.quadraticCurveTo(0, -96, 21, -68); c.quadraticCurveTo(0, -78, -21, -68); c.closePath(); fs(c, o.hutFarbe || '#1b1b22', '#000', 2.5); c.fillStyle = '#ffd23f'; circ(c, 0, -78, 3); c.fill(); }
+  else if (o.hut === 'bandana') { c.beginPath(); c.arc(0, -64, 13.5, Math.PI, 0); c.closePath(); fs(c, o.hutFarbe || '#e63946', '#000', 2.5); tri(c, -13, -66, -24, -60, -20, -72); fs(c, o.hutFarbe || '#e63946', '#000', 2); }
+  else if (o.hut === 'fedora') { rr(c, -20, -71, 40, 6, 3); fs(c, o.hutFarbe || '#3b3b46', '#000', 2.5); rr(c, -11, -85, 22, 15, 5); fs(c, o.hutFarbe || '#3b3b46', '#000', 2.5); c.fillStyle = '#000'; c.fillRect(-11, -75, 22, 3); }
+  else if (o.hut === 'haare') { c.beginPath(); c.arc(0, -64, 14, Math.PI * 0.95, Math.PI * 0.08); c.quadraticCurveTo(2, -70, -13, -58); c.closePath(); fs(c, o.hutFarbe || '#3b2a1e', '#000', 2.5); }
+  else if (o.hut === 'headset') { c.beginPath(); c.arc(0, -64, 14, Math.PI * 0.95, Math.PI * 0.08); c.quadraticCurveTo(2, -70, -13, -58); c.closePath(); fs(c, o.hutFarbe || '#3b2a1e', '#000', 2.5); c.strokeStyle = '#000'; c.lineWidth = 3; c.beginPath(); c.arc(0, -63, 16, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); rr(c, -6, -66, 7, 10, 3); fs(c, '#222', '#000', 2); c.beginPath(); c.moveTo(-2, -57); c.lineTo(9, -53); c.stroke(); }
+  else if (o.hut === 'kochmuetze') { rr(c, -11, -78, 22, 10, 3); fs(c, '#fff', '#000', 2.5); circ(c, -8, -82, 8); fs(c, '#fff', '#000', 2.5); circ(c, 8, -82, 8); fs(c, '#fff', '#000', 2.5); circ(c, 0, -86, 9); fs(c, '#fff', '#000', 2.5); c.fillStyle = '#fff'; c.fillRect(-10, -82, 20, 8); }
+  if (o.hut === 'helm' || o.helm) { circ(c, 1, -63, 18); c.fillStyle = 'rgba(170,215,255,0.22)'; c.fill(); c.strokeStyle = '#000'; c.lineWidth = 2.5; c.stroke(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 2; c.beginPath(); c.arc(1, -63, 13, Math.PI * 1.15, Math.PI * 1.45); c.stroke(); }
   c.restore();
 }
-function zeichnePolly(c, p, t) {
-  const fl = Z.ruhig ? 0.2 : Math.sin(t * 16) * 0.7;
-  c.save(); c.translate(p.x, p.y); c.scale(p.blick < 0 ? -0.5 : 0.5, 0.5); c.lineJoin = 'round';
-  c.save(); c.translate(-18, 8); c.rotate(-0.5 + fl); c.beginPath(); c.moveTo(0, -8); c.quadraticCurveTo(-46, -6, -40, 34); c.quadraticCurveTo(-14, 22, 4, 12); c.closePath(); fs(c, '#2b59c3', '#000', 5); c.restore();
-  ell(c, 0, 22, 26, 32); fs(c, '#3ddc97', '#000', 5);
-  tri(c, -12, -32, -18, -52, -2, -40); fs(c, '#ff9f1c', '#000', 4); tri(c, 0, -36, 2, -58, 12, -38); fs(c, '#ff9f1c', '#000', 4);
-  circ(c, 4, -14, 25); fs(c, '#e63946', '#000', 5);
-  circ(c, 12, -18, 8.5); fs(c, '#fff', '#000', 3.5); c.fillStyle = '#000'; circ(c, 14, -17, 3.8); c.fill();
-  c.beginPath(); c.moveTo(22, -12); c.quadraticCurveTo(42, -10, 38, 10); c.quadraticCurveTo(30, 0, 20, 0); c.closePath(); fs(c, '#ffd23f', '#000', 4);
-  c.restore();
-}
-
 /* Schild über einem Haus: heller Grund, dunkle Schrift (Kontrast über 12:1), Symbol + Text */
 function zeichneSchild(c, x, y, text, o) {
   o = o || {}; const px = schriftWelt(24, 15);
   c.font = 'bold ' + px + 'px ' + TEXT_FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
   let w = c.measureText(text).width + px * 1.1; const h = px * 1.55, zw = o.ziffer != null ? px * 1.5 : 0; w += zw;
   x = clamp(x, w / 2 + 34, Z.W - w / 2 - 34);
-  if (!o.ohnePfosten) { c.fillStyle = '#000'; c.fillRect(x - w * 0.3 - 3, y, 6, h * 0.8); c.fillRect(x + w * 0.3 - 3, y, 6, h * 0.8); }
-  rr(c, x - w / 2, y - h / 2, w, h, 8); fs(c, o.dunkel ? '#dfe5f5' : '#fff8dc', '#000', 4);
-  if (o.gestrichelt) { c.setLineDash([8, 6]); rr(c, x - w / 2 + 6, y - h / 2 + 6, w - 12, h - 12, 4); c.strokeStyle = '#14213d'; c.lineWidth = 2; c.stroke(); c.setLineDash([]); }
-  c.fillStyle = '#14213d'; c.fillText(text, x - zw / 2, y + 1);
+  if (!o.ohnePfosten && S.schild.pfosten !== false) { c.fillStyle = '#000'; c.fillRect(x - w * 0.3 - 3, y, 6, h * 0.8); c.fillRect(x + w * 0.3 - 3, y, 6, h * 0.8); }
+  const F = S.schild;
+  rr(c, x - w / 2, y - h / 2, w, h, 8); fs(c, o.dunkel ? F.zu : F.hell, F.rand, 4);
+  if (o.gestrichelt) { c.setLineDash([8, 6]); rr(c, x - w / 2 + 6, y - h / 2 + 6, w - 12, h - 12, 4); c.strokeStyle = o.dunkel ? F.textZu : F.text; c.lineWidth = 2; c.stroke(); c.setLineDash([]); }
+  c.fillStyle = o.dunkel ? F.textZu : F.text; c.fillText(text, x - zw / 2, y + 1);
   if (o.ziffer != null) { rr(c, x + w / 2 - zw - px * 0.2, y - h / 2 + 5, zw, h - 10, 5); fs(c, '#010d08', '#000', 2); c.fillStyle = '#ffd23f'; c.font = 'bold ' + px * 1.05 + 'px ' + MONO_FONT; c.fillText(String(o.ziffer), x + w / 2 - zw / 2 - px * 0.2, y + 1); }
   return { w, h };
 }
@@ -439,76 +335,237 @@ function schildText(g) {
   return { text: '🔒 ' + g.schild, dunkel: true, gestrichelt: true };
 }
 function codeZeichen() { return [0, 1, 2, 3].map(i => { const s = raumStatus(i); return s.zustand === 'geschafft' && s.ziffer != null ? String(s.ziffer) : s.zustand === 'unsicher' ? '?' : '_'; }); }
-function zeichneTor(c, t) {
-  const tor = Z.tor, bereit = !!(Z.status && Z.status.torBereit), x = tor.x + (tor.wackel > 0 ? Math.sin(tor.wackel * 40) * 5 * tor.wackel : 0), y = tor.y;
-  if (bereit) { c.fillStyle = 'rgba(255,214,120,' + (0.25 + 0.2 * puls(t)) + ')'; ell(c, x, y - 30, 120, 44); c.fill(); }
-  rr(c, x - 92, y - 78, 26, 110, 6); fs(c, '#3a4a7a', '#000', 4); rr(c, x + 66, y - 78, 26, 110, 6); fs(c, '#3a4a7a', '#000', 4);
-  circ(c, x - 79, y - 84, 12); fs(c, '#ffe7a3', '#000', 3); circ(c, x + 79, y - 84, 12); fs(c, '#ffe7a3', '#000', 3);
-  c.strokeStyle = '#000'; c.lineWidth = 5; c.beginPath(); c.moveTo(x - 66, y + 28); c.lineTo(x - 66, y - 40); c.quadraticCurveTo(x, y - 76, x + 66, y - 40); c.lineTo(x + 66, y + 28); c.stroke();
-  c.strokeStyle = bereit ? '#ffd23f' : '#9aa6c8'; c.lineWidth = 4;
-  for (let i = -55; i <= 55; i += 11) { const top = y - 40 - 18 * (1 - (i / 66) * (i / 66)); c.beginPath(); c.moveTo(x + i, top + 4); c.lineTo(x + i, y + 26); c.stroke(); }
-  c.beginPath(); c.moveTo(x - 64, y - 10); c.lineTo(x + 64, y - 10); c.stroke();
-  circ(c, x, y - 10, 17); fs(c, '#0b1736', '#000', 3); symbol(c, bereit ? 'pfeil' : 'schloss', x, y - 10, 12);
+/* ---------- Roboter (für mehrere Welten): Füße bei (x,y). o: farbe, auge, schwebt, antenne, blick, hop, groesse ---------- */
+function zeichneRoboter(c, x, y, t, o) {
+  const s = o.groesse || 1, schw = o.schwebt ? 16 + (Z.ruhig ? 0 : Math.sin(t * 3 + x) * 4) : 0, lift = (o.hop > 0 ? Math.sin((1 - clamp(o.hop, 0, 1)) * Math.PI) * 12 : 0) + schw;
+  c.fillStyle = 'rgba(0,0,0,0.32)'; ell(c, x, y, (o.schwebt ? 15 : 20) * s, 6 * s); c.fill();
+  c.save(); c.translate(x, y - lift); c.scale(s * (o.blick < 0 ? -1 : 1), s); c.lineJoin = 'round'; c.lineCap = 'round';
+  if (o.schwebt) { c.fillStyle = 'rgba(' + (o.schub || '120,220,255') + ',0.55)'; tri(c, -8, -8, 8, -8, 0, 6 + (Z.ruhig ? 0 : Math.sin(t * 18) * 3)); c.fill(); }
+  else { circ(c, -10, -6, 7); fs(c, '#222', '#000', 2.5); circ(c, 10, -6, 7); fs(c, '#222', '#000', 2.5); }
+  rr(c, -16, -44, 32, 36, 8); fs(c, o.farbe || '#8fa3c8', '#000', 2.5);
+  c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(-10, -26, 20, 4); c.fillRect(-10, -19, 20, 4);
+  if (o.brett) { rr(c, 12, -40, 15, 19, 3); fs(c, '#fff', '#000', 2); c.fillStyle = '#000'; c.fillRect(15, -35, 9, 2); c.fillRect(15, -30, 9, 2); }
+  rr(c, -13, -66, 26, 20, 7); fs(c, o.kopf || o.farbe || '#8fa3c8', '#000', 2.5);
+  rr(c, -8, -61, 20, 9, 4); fs(c, '#0b1736', '#000', 2);
+  c.fillStyle = o.auge || '#7df9ff'; const bl = (t % 3.3) < 0.12 && !Z.ruhig; if (bl) c.fillRect(-3, -57, 12, 2); else { circ(c, 0, -56.5, 2.6); c.fill(); circ(c, 8, -56.5, 2.6); c.fill(); }
+  if (o.antenne !== false) { c.strokeStyle = '#000'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(0, -66); c.lineTo(0, -76); c.stroke(); circ(c, 0, -78, 3.5); fs(c, o.auge || '#7df9ff', '#000', 2); }
+  c.restore();
 }
-function zeichneTafel(c) {
-  const T = Z.tafel, z = codeZeichen(), px = schriftWelt(26, 17), bw = px * 0.95, w = bw * 4 + px * 0.9, h = px * 2.5;
-  c.fillStyle = '#000'; c.fillRect(T.x - 4, T.y - 6, 8, 34);
-  rr(c, T.x - w / 2, T.y - h, w, h, 8); fs(c, '#010d08', '#000', 4); c.strokeStyle = '#ffd23f'; c.lineWidth = 2; rr(c, T.x - w / 2 + 5, T.y - h + 5, w - 10, h - 10, 5); c.stroke();
-  c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold ' + px * 0.5 + 'px ' + TEXT_FONT; c.fillText('CODE', T.x, T.y - h + px * 0.62);
-  c.font = 'bold ' + px + 'px ' + MONO_FONT; c.fillStyle = '#ffd23f';
-  for (let i = 0; i < 4; i++) c.fillText(z[i], T.x + (i - 1.5) * bw, T.y - px * 0.82);
+
+/* ============ STILE: das Aussehen der Welten ============
+   Eine Stil-Datei meldet sich so an:  window.KartenStile.<name> = function (K) { return { … }; };
+   K ist der Werkzeugkasten des Motors (Zeichen-Hilfen, Zustand Z, Grundstil K.basis).
+   Was eine Stil-Datei nicht selbst mitbringt, übernimmt der Grundstil „neutral“ (BASIS). */
+window.KartenStile = window.KartenStile || {};
+const stilFehlt = {}, stilWartet = {};
+
+function wegAbstand(x, y) { let m = 1e9; for (const P of Z.wege) for (let i = 0; i < P.length - 1; i++) m = Math.min(m, segDist(x, y, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1])); return m; }
+// Einfache Wege: vom Ausgang gerade hoch zum Zusatzraum, dazu ein Abzweig zu jedem Raum (nur gemalt)
+function standardWege() {
+  const w = [[[Z.tor.x, Z.tor.y], [Z.tor.x, Z.raub.spot.y - 10], [Z.raub.x, Z.raub.spot.y - 10]]];
+  for (const g of Z.G) w.push([[g.spot.x, g.spot.y - 14], [g.spot.x, g.spot.y + 28], [Z.tor.x, g.spot.y + 28]]);
+  return w;
+}
+// Freie Plätze für Dekoration suchen (fester Zufall): nicht auf Wegen, nicht vor Türen, nicht bei Figuren
+function streue(n, seed, o) {
+  o = o || {}; const R = seeded(seed), out = [], rand = o.rand || 110, oben = o.oben || 180, unten = o.unten || 150, ab = o.abstand || 120, weg = o.weg == null ? 74 : o.weg;
+  const imRect = (r, x, y, p) => x > r.x0 - p && x < r.x1 + p && y > r.y0 - p && y < r.y1 + p;
+  for (let i = 0; i < 1200 && out.length < n; i++) {
+    const x = rand + R() * (Z.W - 2 * rand), y = oben + R() * (Z.H - oben - unten), z = R(), z2 = R();
+    if (weg && wegAbstand(x, y) < weg) continue;
+    let ok = !imRect(Z.raub.rect, x, y, 80) && dist(x, y, Z.raub.spot.x, Z.raub.spot.y) > 120 && dist(x, y, Z.start.x, Z.start.y) > 130 && dist(x, y, Z.tafel.x, Z.tafel.y) > 120 && dist(x, y, Z.tor.spot.x, Z.tor.spot.y) > 130;
+    for (const g of Z.G) if (imRect(g.rect, x, y, 70) || dist(x, y, g.spot.x, g.spot.y) < 130 || (Math.abs(x - g.x) < 180 && y < g.rect.y0 && y > g.rect.y0 - 110)) ok = false;
+    for (const f of Z.figs) { if (f.runde) { for (let k = 0; k < f.runde.length; k++) { const a = f.runde[k], b = f.runde[(k + 1) % f.runde.length]; if (segDist(x, y, a.x, a.y, b.x, b.y) < 70) ok = false; } } else if (dist(x, y, f.x, f.y) < 110) ok = false; }
+    for (const h of Z.hind) { if (h.r != null) { if (dist(x, y, h.x, h.y) < h.r + ab) ok = false; } else if (imRect(h, x, y, ab * 0.6)) ok = false; }
+    for (const q of out) if (dist(x, y, q.x, q.y) < ab) ok = false;
+    if (ok) out.push({ x, y, z, z2 });
+  }
+  return out;
+}
+/* Bausteine für Räume: Fenster mit dem Emoji des Raums, Fenster mit dem Zustand (Form!), Tür */
+function fensterEmoji(c, g, x, y, zu, r) { const F = S.farben; circ(c, x, y, r || 34); fs(c, zu ? F.fensterZu : F.fenster, '#000', 4); c.globalAlpha = zu ? 0.5 : 1; emoji(c, g.emoji, x, y + 2, (r || 34) * 1.24); c.globalAlpha = 1; }
+function fensterZustand(c, z, x, y, r) { circ(c, x, y, r || 30); fs(c, S.farben.zustand || '#0b1736', '#000', 4); symbol(c, SYMBOL[z] || 'schloss', x, y, (r || 30) * 0.67); }
+// Tür: unten Mitte bei (x, y+40). form: 'bogen' | 'eckig' | 'rund'. Gesperrt = Gitter oder Warnstreifen, offen = hell, fertig = dunkel.
+function tuer(c, x, y, z, o) {
+  o = o || {}; const F = S.farben, zu = z === 'gesperrt', fertig = z === 'geschafft' || z === 'unsicher', b = o.breite || 30, form = o.form || 'bogen';
+  const pfad = () => { c.beginPath(); if (form === 'rund') c.arc(x, y + 2, b + 8, 0, TAU); else if (form === 'eckig') c.rect(x - b, y - 54, b * 2, 94); else { c.moveTo(x - b, y + 40); c.lineTo(x - b, y - 30); c.arc(x, y - 30, b, Math.PI, 0); c.lineTo(x + b, y + 40); } c.closePath(); };
+  pfad(); fs(c, zu ? F.tuerZu : fertig ? F.tuerFertig : F.tuer, '#000', 4);
+  if (zu) {
+    c.save(); pfad(); c.clip(); c.strokeStyle = F.gitter; c.lineWidth = 4;
+    if (o.sperre === 'streifen') { for (let i = -120; i < 120; i += 18) { c.beginPath(); c.moveTo(x + i, y + 44); c.lineTo(x + i + 60, y - 64); c.stroke(); } }
+    else { for (let i = -b + 10; i <= b - 10; i += 10) { c.beginPath(); c.moveTo(x + i, y - 64); c.lineTo(x + i, y + 44); c.stroke(); } c.beginPath(); c.moveTo(x - b - 8, y - 4); c.lineTo(x + b + 8, y - 4); c.stroke(); }
+    c.restore();
+  } else if (!fertig) { c.save(); pfad(); c.clip(); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(x - b * 0.55, y - 70, b * 0.45, 120); c.restore(); }
+  else { c.fillStyle = '#000'; circ(c, x + b * 0.5, y + 6, 4); c.fill(); }
+}
+function zeichneWege(c, randFarbe, farbe, b1, b2) {
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (const pass of [0, 1]) { c.strokeStyle = pass ? farbe : randFarbe; c.lineWidth = pass ? (b2 || 54) : (b1 || 66); for (const P of Z.wege) { c.beginPath(); c.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) c.lineTo(P[i][0], P[i][1]); c.stroke(); } }
+}
+// Wände am Rand: oben ein Band, links und rechts schmal, unten mit Öffnung für den Ausgang
+function zeichneWaende(c, farbe, bodenTor) {
+  const W = Z.W, H = Z.H, tor = Z.tor, o = S.masse.grenzen.o - 30;
+  c.fillStyle = farbe; c.strokeStyle = '#000'; c.lineWidth = 4;
+  c.fillRect(0, 0, W, o); c.strokeRect(-4, -4, W + 8, o + 4);
+  c.fillRect(0, 0, 30, H); c.fillRect(W - 30, 0, 30, H);
+  c.fillRect(0, tor.y - 8, tor.x - 78, H); c.strokeRect(-4, tor.y - 8, tor.x - 74, H);
+  c.fillRect(tor.x + 78, tor.y - 8, W, H); c.strokeRect(tor.x + 78, tor.y - 8, W, H);
+  if (bodenTor) { c.fillStyle = bodenTor; c.fillRect(tor.x - 74, tor.y - 8, 148, H); }
+}
+function lichtKegel(c, x, y, winkel, weite, rgb, breite) {
+  c.save(); c.globalCompositeOperation = 'lighter'; c.translate(x, y); c.rotate(winkel);
+  const g = c.createRadialGradient(0, 0, 8, 0, 0, weite); g.addColorStop(0, 'rgba(' + rgb + ',0.32)'); g.addColorStop(1, 'rgba(' + rgb + ',0)');
+  c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, weite, -(breite || 0.4), breite || 0.4); c.closePath(); c.fill(); c.restore();
+}
+function lichtFleck(c, x, y, r, rgb, a) { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(' + rgb + ',' + (a || 0.3) + ')'); g.addColorStop(1, 'rgba(' + rgb + ',0)'); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }
+// Wort-Figur als Emoji auf einem Sockel, mit kleinem Trick beim Antippen
+function emojiFigur(c, f, t, sockel) {
+  const lift = f.hop > 0 ? Math.sin((1 - clamp(f.hop, 0, 1)) * Math.PI) * 14 : 0;
+  c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, f.x, f.y, 20, 7); c.fill();
+  rr(c, f.x - 16, f.y - 12, 32, 12, 4); fs(c, sockel || '#5a4636', '#000', 2.5);
+  const u = clamp(f.trickT, 0, 1), dreh = Z.ruhig || u <= 0 ? 0 : f.trick === 'rollen' ? (1 - u) * TAU : f.trick === 'drehen' ? Math.sin(u * Math.PI * 3) * 0.55 : 0;
+  c.save(); c.translate(f.x + (f.trick === 'rollen' && !Z.ruhig ? Math.sin(u * Math.PI) * 26 : 0), f.y - 34 - lift); c.rotate(dreh); emoji(c, f.emoji, 0, 0, 42); c.restore();
+}
+
+/* ---------- Grundstil „neutral“: schlichte Halle. Gilt, wenn eine Stil-Datei fehlt, und als Vorlage für alle Stile. ---------- */
+const BASIS = {
+  name: 'neutral', begleiterAmBoden: false, zusatzTon: 'tipp', spielerLicht: false, texte: {},
+  masse: { raum: { l: 130, o: 110, u: 40, spot: 74 }, zusatz: { l: 150, o: 110, u: 40, spot: 74 }, tafel: { dx: 160, dy: -62 }, grenzen: { l: 56, r: 56, o: 98, u: 26 }, schild: 46 },
+  schild: { hell: '#fff8dc', zu: '#dfe5f5', text: '#14213d', textZu: '#14213d', rand: '#000' },
+  marke: { regel: '📋', wort: '💬', zeit: '🔦' },
+  farben: { hinter: '#050b1c', ziel: '#ffd23f', fx: ['#ffd23f', '#fff', '#9ecbff'], boden: '#17223b', raster: 'rgba(255,255,255,0.05)', rasterWeite: 80, weg: '#34416b', wegRand: '#1d2747', wand: '#26345e',
+    raum: ['#3d4f86'], dach: '#1b2646', tuer: '#ffd23f', tuerZu: '#141d38', tuerFertig: '#2a3b63', fenster: '#fff3c4', fensterZu: '#22314f', zustand: '#0b1736', gitter: '#9aa6c8',
+    zusatz: '#4a3550', tafel: '#010d08', tafelRand: '#ffd23f', tafelText: '#ffd23f', licht: '255,205,110', kegel: '190,220,255', sockel: '#5a4636', torPfosten: '#3a4a7a', torLicht: '#ffe7a3' },
+  leute: {
+    spieler: { jacke: '#ffd23f', hose: '#2b59c3', haut: '#dba77c', hut: 'muetze', rucksack: true, lampe: true },
+    regel: { jacke: '#2e7d5b', hose: '#3a4a7a', haut: '#e8b98f', hut: 'hut', brett: true, groesse: 1.08 },
+    zeit: { jacke: '#26345e', hose: '#1b2646', haut: '#c98f62', hut: 'kappe', lampe: true, streifen: '#ffd23f', groesse: 1.12 },
+    begleiter: { jacke: '#e63946', hose: '#1b2646', haut: '#e8b98f', hut: 'hut', groesse: 1.1 }
+  },
+  bau() { Z.wege = standardWege(); },
+  fest() { return false; },
+  boden(c) {
+    const F = S.farben; c.fillStyle = F.boden; c.fillRect(0, 0, Z.W, Z.H);
+    c.strokeStyle = F.raster; c.lineWidth = 2; c.beginPath(); for (let x = 0; x <= Z.W; x += F.rasterWeite) { c.moveTo(x, 0); c.lineTo(x, Z.H); } for (let y = 0; y <= Z.H; y += F.rasterWeite) { c.moveTo(0, y); c.lineTo(Z.W, y); } c.stroke();
+    zeichneWege(c, F.wegRand, F.weg); zeichneWaende(c, F.wand, F.weg);
+  },
+  licht(c, t) {
+    const F = S.farben; c.save(); c.globalCompositeOperation = 'lighter';
+    for (const l of Z.lampen) lichtFleck(c, l.x, l.y, (l.r || 150) + 6 * puls(t + l.x, 2.3), l.rgb || F.licht, l.a);
+    c.restore();
+    if (S.spielerLicht) lichtKegel(c, Z.P.x, Z.P.y - 8, Z.P.winkel, 210, '255,245,200', 0.42);
+  },
+  dinge(c, t, add, sichtbar) { for (const d of Z.deko) if (sichtbar(d.x, d.y, 160)) add(d.y, () => S.deko(c, d, t)); },
+  deko(c, d) { c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, d.x, d.y, 26, 8); c.fill(); rr(c, d.x - 22, d.y - 36, 44, 38, 5); fs(c, '#55628c', '#000', 3); c.strokeStyle = '#000'; c.lineWidth = 2; c.beginPath(); c.moveTo(d.x - 22, d.y - 36); c.lineTo(d.x + 22, d.y + 2); c.moveTo(d.x + 22, d.y - 36); c.lineTo(d.x - 22, d.y + 2); c.stroke(); },
+  raum(c, g) {
+    const st = raumStatus(g.nr), z = st.zustand, zu = z === 'gesperrt', F = S.farben, M = S.masse.raum, x = g.x + (g.wackel > 0 ? Math.sin(g.wackel * 40) * 5 * g.wackel : 0), y = g.y;
+    c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, x, y + 40, M.l + 10, 16); c.fill();
+    rr(c, x - M.l, y - M.o, M.l * 2, M.o + M.u, 16); fs(c, F.raum[g.nr % F.raum.length], '#000', 4);
+    if (zu) { c.fillStyle = 'rgba(5,11,28,0.5)'; rr(c, x - M.l, y - M.o, M.l * 2, M.o + M.u, 16); c.fill(); }
+    rr(c, x - M.l - 10, y - M.o - 14, M.l * 2 + 20, 36, 14); fs(c, F.dach, '#000', 4);
+    fensterEmoji(c, g, x - 84, y - 38, zu); fensterZustand(c, z, x + 84, y - 38); tuer(c, x, y, z);
+  },
+  zusatz(c, r, t) {
+    const F = S.farben, M = S.masse.zusatz, x = r.x + (r.wackel > 0 && !Z.ruhig ? Math.sin(r.wackel * 40) * 4 * r.wackel : 0), y = r.y;
+    c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, x, y + 40, M.l + 10, 18); c.fill();
+    rr(c, x - M.l, y - M.o, M.l * 2, M.o + M.u, 16); fs(c, F.zusatz, '#000', 4);
+    rr(c, x - M.l - 10, y - M.o - 14, M.l * 2 + 20, 36, 14); fs(c, F.dach, '#000', 4);
+    rr(c, x - 110, y - 70, 220, 92, 12); fs(c, '#161f3c', '#000', 4);
+    emoji(c, r.emoji, x, y - 22, r.wach > 0 && !Z.ruhig ? 62 + Math.sin(r.wach * 9) * 7 : 62);
+  },
+  tafel(c) {
+    const T = Z.tafel, F = S.farben, z = codeZeichen(), px = schriftWelt(26, 17), bw = px * 0.95, w = bw * 4 + px * 0.9, h = px * 2.5;
+    c.fillStyle = '#000'; c.fillRect(T.x - 4, T.y - 6, 8, 34);
+    rr(c, T.x - w / 2, T.y - h, w, h, 8); fs(c, F.tafel, '#000', 4); c.strokeStyle = F.tafelRand; c.lineWidth = 2; rr(c, T.x - w / 2 + 5, T.y - h + 5, w - 10, h - 10, 5); c.stroke();
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold ' + px * 0.5 + 'px ' + TEXT_FONT; c.fillText('CODE', T.x, T.y - h + px * 0.62);
+    c.font = 'bold ' + px + 'px ' + MONO_FONT; c.fillStyle = F.tafelText;
+    for (let i = 0; i < 4; i++) c.fillText(z[i], T.x + (i - 1.5) * bw, T.y - px * 0.82);
+  },
+  tor(c, t) {
+    const tor = Z.tor, F = S.farben, bereit = !!(Z.status && Z.status.torBereit), x = tor.x + (tor.wackel > 0 ? Math.sin(tor.wackel * 40) * 5 * tor.wackel : 0), y = tor.y;
+    if (bereit) { c.fillStyle = 'rgba(' + F.licht + ',' + (0.25 + 0.2 * puls(t)) + ')'; ell(c, x, y - 30, 120, 44); c.fill(); }
+    rr(c, x - 92, y - 78, 26, 110, 6); fs(c, F.torPfosten, '#000', 4); rr(c, x + 66, y - 78, 26, 110, 6); fs(c, F.torPfosten, '#000', 4);
+    rr(c, x - 66, y - 64, 132, 96, 8); fs(c, bereit ? F.tuer : F.tuerZu, '#000', 4);
+    if (!bereit) { c.strokeStyle = F.gitter; c.lineWidth = 4; for (let i = -55; i <= 55; i += 11) { c.beginPath(); c.moveTo(x + i, y - 60); c.lineTo(x + i, y + 28); c.stroke(); } }
+    circ(c, x, y - 16, 19); fs(c, '#0b1736', '#000', 3); symbol(c, bereit ? 'pfeil' : 'schloss', x, y - 16, 13);
+  },
+  figur(c, f, t, P) {
+    const L = S.leute, F = S.farben;
+    if (f.art === 'waerterin') zeichnePerson(c, f.x, f.y, t, Object.assign({}, L.regel, { blick: P.x < f.x ? -1 : 1, hop: f.hop }));
+    else if (f.art === 'waechter') { lichtKegel(c, f.x, f.y - 10, f.kegel, 170, F.kegel, 0.36); zeichnePerson(c, f.x, f.y, t, Object.assign({}, L.zeit, { blick: f.blick, gehen: f.geht, hop: f.hop })); }
+    else emojiFigur(c, f, t, F.sockel);
+  },
+  spieler(c, P, t) { zeichnePerson(c, P.x, P.y, t, Object.assign({}, S.leute.spieler, { blick: P.blick, gehen: P.geht, hop: P.hop })); },
+  begleiter(c, po, t) {
+    if (S.begleiterAmBoden) { zeichnePerson(c, po.x, po.y, t, Object.assign({}, S.leute.begleiter, { blick: po.blick, gehen: po.geht, hop: po.hop })); return; }
+    c.fillStyle = 'rgba(' + S.farben.licht + ',0.35)'; circ(c, po.x, po.y, 24 + 3 * puls(t, 3)); c.fill(); circ(c, po.x, po.y, 16); fs(c, '#0b1736', '#000', 3); emoji(c, S.begleiterEmoji || '💬', po.x, po.y + 1, 18);
+  },
+  zusatzSchild(r) { return r.emoji + ' ' + r.name; },
+  torSchild() { return { x: Z.tor.x - 210, y: Z.H - Math.max(26, 20 / Z.scale), ohnePfosten: true }; },
+  markeHoehe(f) { return f.art === 'waerterin' ? 104 : 76; }
+};
+// Werkzeugkasten für die Stil-Dateien
+const K = { Z, API, VERSION, TAU, clamp, lerp, dist, rnd, seeded, segDist, zahl, circ, ell, rr, tri, fs, emoji, sternForm, puls, schriftWelt, symbol, SYMBOL, raumStatus, naechstes, codeZeichen,
+  zeichnePerson, zeichneRoboter, zeichneSchild, zeichneWege, zeichneWaende, lichtKegel, lichtFleck, emojiFigur, fensterEmoji, fensterZustand, tuer, wegAbstand, standardWege, streue,
+  EMOJI_FONT, TEXT_FONT, MONO_FONT, basis: BASIS, stil: () => S };
+
+function stilFuer(name) {
+  const fab = name ? window.KartenStile[name] : null; let eigen = null;
+  if (typeof fab === 'function') { try { eigen = fab(K); } catch (e) { if (window.console) console.error('Karte: Stil „' + name + '“ ist fehlerhaft – neutrales Aussehen.', e); eigen = null; } }
+  const st = Object.assign({}, BASIS, eigen || {}); st.name = eigen ? name : 'neutral';
+  const E = eigen || {};
+  st.masse = Object.assign({}, BASIS.masse, E.masse || {}); for (const k of ['raum', 'zusatz', 'tafel', 'grenzen']) st.masse[k] = Object.assign({}, BASIS.masse[k], (E.masse && E.masse[k]) || {});
+  st.schild = Object.assign({}, BASIS.schild, E.schild || {}); st.marke = Object.assign({}, BASIS.marke, E.marke || {}); st.farben = Object.assign({}, BASIS.farben, E.farben || {});
+  st.leute = Object.assign({}, BASIS.leute, E.leute || {});
+  return st;
+}
+// Stil-Datei nachladen: nur aus dem eigenen Ordner, nur einfache Namen. fertig(true/false) wird danach aufgerufen.
+function ladeStil(name, fertig) {
+  if (!name || !/^[a-z0-9-]{1,30}$/.test(name) || stilFehlt[name]) { fertig(false); return; }
+  if (window.KartenStile[name]) { fertig(true); return; }
+  if (stilWartet[name]) { stilWartet[name].push(fertig); return; }
+  stilWartet[name] = [fertig];
+  const ende = () => { const l = stilWartet[name] || []; delete stilWartet[name]; const ok = !!window.KartenStile[name]; if (!ok) { stilFehlt[name] = true; if (window.console) console.warn('Karte: welt/stil-' + name + '.js fehlt oder ist fehlerhaft – neutrales Aussehen.'); } l.forEach(f => sicher(f)(ok)); };
+  const sk = document.createElement('script'); sk.src = ORDNER + 'stil-' + name + '.js?v=' + encodeURIComponent(API.version || VERSION);
+  sk.onload = ende; sk.onerror = ende; document.head.appendChild(sk);
 }
 
 function zeichne(c, t) {
-  const cam = Z.cam, vw = Z.w / Z.scale, vh = Z.h / Z.scale, k = Z.scale * Z.dpr, P = Z.P;
-  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.fillStyle = '#050b1c'; c.fillRect(0, 0, canvas.width, canvas.height);
+  const cam = Z.cam, vw = Z.w / Z.scale, vh = Z.h / Z.scale, k = Z.scale * Z.dpr, P = Z.P, F = S.farben;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.fillStyle = F.hinter; c.fillRect(0, 0, canvas.width, canvas.height);
   c.setTransform(k, 0, 0, k, -cam.x * k, -cam.y * k);
   const sichtbar = (x, y, m) => x > cam.x - m && x < cam.x + vw + m && y > cam.y - m && y < cam.y + vh + m;
-  zeichneBoden(c, t);
-  zeichneLicht(c, t);
+  S.boden(c, t);
+  S.licht(c, t);
   const nx = naechstes(), bereit = !!(Z.status && Z.status.torBereit);
   const ziel = nx >= 0 ? Z.G[nx].spot : bereit ? Z.tor.spot : null;
-  if (ziel) { c.strokeStyle = '#ffd23f'; c.lineWidth = 5; c.setLineDash([12, 8]); const r = 34 + 8 * puls(t); ell(c, ziel.x, ziel.y, r, r * 0.5); c.stroke(); c.setLineDash([]); }
+  if (ziel) { c.strokeStyle = F.ziel; c.lineWidth = 5; c.setLineDash([12, 8]); const r = 34 + 8 * puls(t); ell(c, ziel.x, ziel.y, r, r * 0.5); c.stroke(); c.setLineDash([]); }
   if (Z.marker) { const m = Z.marker, u = 1 - m.t / 0.6; c.strokeStyle = 'rgba(255,255,255,' + (1 - u) + ')'; c.lineWidth = 4; ell(c, m.x, m.y, 10 + u * 22, (10 + u * 22) * 0.5); c.stroke(); }
 
   // Alles, was steht, nach y sortiert (wer weiter unten steht, verdeckt)
   const items = [], add = (y, f) => items.push({ y, f });
-  const verdeckt = b => P.y < b.y && b.y - P.y < 120 * b.s && Math.abs(P.x - b.x) < 46 * b.s;
-  for (const b of Z.baeume) if (sichtbar(b.x, b.y, 140)) add(b.y, () => zeichneBaum(c, b, verdeckt(b) ? 0.4 : 1));
-  for (const g of Z.G) if (sichtbar(g.x, g.y, 260)) add(g.y + 40, () => zeichneGehege(c, g, t));
-  add(Z.raub.y + 40, () => zeichneRaub(c, Z.raub, t));
-  add(Z.brunnen.y, () => zeichneBrunnen(c, Z.brunnen, t));
-  for (const l of Z.lampen) if (sichtbar(l.x, l.y, 120)) add(l.y, () => zeichneLampe(c, l, t));
-  add(Z.tafel.y, () => zeichneTafel(c));
-  for (const f of Z.figs) add(f.y, () => {
-    if (f.art === 'waerterin') zeichnePerson(c, f.x, f.y, t, { jacke: '#2e7d5b', hose: '#3a4a7a', haut: '#e8b98f', hut: 'hut', brett: true, blick: P.x < f.x ? -1 : 1, hop: f.hop, groesse: 1.08 });
-    else if (f.art === 'waechter') {
-      c.save(); c.globalCompositeOperation = 'lighter'; c.translate(f.x, f.y - 10); c.rotate(f.kegel);
-      const g = c.createRadialGradient(0, 0, 8, 0, 0, 170); g.addColorStop(0, 'rgba(190,220,255,0.30)'); g.addColorStop(1, 'rgba(190,220,255,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 170, -0.36, 0.36); c.closePath(); c.fill(); c.restore();
-      zeichnePerson(c, f.x, f.y, t, { jacke: '#26345e', hose: '#1b2646', haut: '#c98f62', hut: 'kappe', lampe: true, streifen: '#ffd23f', blick: f.blick, gehen: f.geht, hop: f.hop, groesse: 1.12 });
-    } else {
-      const lift = f.hop > 0 ? Math.sin((1 - clamp(f.hop, 0, 1)) * Math.PI) * 14 : 0;
-      c.fillStyle = 'rgba(0,0,0,0.3)'; ell(c, f.x, f.y, 20, 7); c.fill();
-      rr(c, f.x - 16, f.y - 12, 32, 12, 4); fs(c, '#5a4636', '#000', 2.5);
-      const u = clamp(f.trickT, 0, 1), dreh = Z.ruhig || u <= 0 ? 0 : f.trick === 'rollen' ? (1 - u) * TAU : f.trick === 'drehen' ? Math.sin(u * Math.PI * 3) * 0.55 : 0;
-      c.save(); c.translate(f.x + (f.trick === 'rollen' && !Z.ruhig ? Math.sin(u * Math.PI) * 26 : 0), f.y - 34 - lift); c.rotate(dreh); emoji(c, f.emoji, 0, 0, 42); c.restore();
-    }
-  });
-  add(P.y + 0.1, () => zeichnePerson(c, P.x, P.y, t, { jacke: '#ffd23f', hose: '#2b59c3', haut: '#dba77c', hut: 'muetze', rucksack: true, lampe: true, blick: P.blick, gehen: P.geht, hop: P.hop }));
+  S.dinge(c, t, add, sichtbar, P);
+  for (const g of Z.G) if (sichtbar(g.x, g.y, 260)) add(g.y + 40, () => S.raum(c, g, t));
+  add(Z.raub.y + 40, () => S.zusatz(c, Z.raub, t));
+  add(Z.tafel.y, () => S.tafel(c, t));
+  for (const f of Z.figs) add(f.y, () => S.figur(c, f, t, P));
+  if (Z.hatPolly && S.begleiterAmBoden) add(Z.polly.y, () => S.begleiter(c, Z.polly, t));
+  add(P.y + 0.1, () => S.spieler(c, P, t));
   items.sort((a, b) => a.y - b.y); for (const it of items) it.f();
-  zeichneTor(c, t);
+  S.tor(c, t);
 
   // Darüber: Schilder, Pfeil, Tastatur-Rahmen, kleine Tipp-Marken – damit nichts davon verdeckt wird
   for (const g of Z.G) {
-    const s = schildText(g), sy = g.rect.y0 - 46, sz = zeichneSchild(c, g.x, sy, s.text, s);
-    if (g.nr === nx) { const b = Z.ruhig ? 0 : Math.abs(Math.sin(t * 4)) * 14, ay = sy - sz.h / 2 - 16 - b, sc = Math.max(1, 0.75 / Z.scale); c.save(); c.translate(g.x, ay); c.scale(sc, sc); tri(c, -20, -26, 20, -26, 0, 4); fs(c, '#ffd23f', '#000', 4); c.restore(); }
+    const s = schildText(g), sy = g.rect.y0 - S.masse.schild, sz = zeichneSchild(c, g.x, sy, s.text, s);
+    if (g.nr === nx) { const b = Z.ruhig ? 0 : Math.abs(Math.sin(t * 4)) * 14, ay = sy - sz.h / 2 - 16 - b, sc = Math.max(1, 0.75 / Z.scale); c.save(); c.translate(g.x, ay); c.scale(sc, sc); tri(c, -20, -26, 20, -26, 0, 4); fs(c, F.ziel, '#000', 4); c.restore(); }
   }
-  zeichneSchild(c, Z.raub.x, Z.raub.rect.y0 - 46, Z.raub.emoji + ' ' + Z.raub.name + ' 💤', { dunkel: true });
-  zeichneSchild(c, Z.tor.x - 210, Z.H - Math.max(26, 20 / Z.scale), (bereit ? '▶ ' : '🔒 ') + Z.tor.name, { dunkel: !bereit, gestrichelt: !bereit, ohnePfosten: true });
-  for (const f of Z.figs) if (f.art !== 'waechter') { const m = f.art === 'waerterin' ? '📋' : '🐾', by = f.y - (f.art === 'waerterin' ? 104 : 76) - (Z.ruhig ? 0 : Math.sin(t * 3 + f.x) * 3), r = Math.max(15, 13 / Z.scale); c.beginPath(); c.arc(f.x, by, r, Math.PI * 0.62, Math.PI * 0.38); c.lineTo(f.x, by + r * 1.45); c.closePath(); fs(c, '#fff', '#000', 3); emoji(c, m, f.x, by + 1, r * 1.05); }
+  zeichneSchild(c, Z.raub.x, Z.raub.rect.y0 - S.masse.schild, S.zusatzSchild(Z.raub), { dunkel: true });
+  const ts = S.torSchild();
+  zeichneSchild(c, ts.x, ts.y, (bereit ? '▶ ' : '🔒 ') + Z.tor.name, { dunkel: !bereit, gestrichelt: !bereit, ohnePfosten: ts.ohnePfosten });
+  for (const f of Z.figs) if (f.art !== 'waechter') { const m = f.art === 'waerterin' ? S.marke.regel : S.marke.wort, by = f.y - S.markeHoehe(f) - (Z.ruhig ? 0 : Math.sin(t * 3 + f.x) * 3), r = Math.max(15, 13 / Z.scale); c.beginPath(); c.arc(f.x, by, r, Math.PI * 0.62, Math.PI * 0.38); c.lineTo(f.x, by + r * 1.45); c.closePath(); fs(c, '#fff', '#000', 3); emoji(c, m, f.x, by + 1, r * 1.05); }
   if (Z.fokus) { const z = zielVon(Z.fokus); if (z) { c.strokeStyle = '#fff'; c.lineWidth = 6; c.setLineDash([14, 8]); rr(c, z.rahmen.x0, z.rahmen.y0, z.rahmen.x1 - z.rahmen.x0, z.rahmen.y1 - z.rahmen.y0, 14); c.stroke(); c.strokeStyle = '#000'; c.lineWidth = 2; c.stroke(); c.setLineDash([]); } }
-  if (Z.hatPolly) zeichnePolly(c, Z.polly, t);
-  for (const q of Z.fx) { c.save(); c.globalAlpha = clamp(q.life / q.max * 1.6, 0, 1); c.translate(q.x, q.y); c.rotate(q.rot); c.fillStyle = q.form === 0 ? '#ffd23f' : q.form === 1 ? '#fff' : '#9ecbff'; c.strokeStyle = '#000'; c.lineWidth = 1.5; if (q.form === 0) sternForm(c, 0, 0, q.size); else if (q.form === 1) { c.beginPath(); c.rect(-q.size / 2, -q.size / 3, q.size, q.size * 0.66); } else circ(c, 0, 0, q.size / 2); c.fill(); c.stroke(); c.restore(); }
+  if (Z.hatPolly && !S.begleiterAmBoden) S.begleiter(c, Z.polly, t);
+  for (const q of Z.fx) { c.save(); c.globalAlpha = clamp(q.life / q.max * 1.6, 0, 1); c.translate(q.x, q.y); c.rotate(q.rot); c.fillStyle = F.fx[q.form] || '#fff'; c.strokeStyle = '#000'; c.lineWidth = 1.5; if (q.form === 0) sternForm(c, 0, 0, q.size); else if (q.form === 1) { c.beginPath(); c.rect(-q.size / 2, -q.size / 3, q.size, q.size * 0.66); } else circ(c, 0, 0, q.size / 2); c.fill(); c.stroke(); c.restore(); }
 
   // Bildschirm-Ebene: Sprechblasen und Pfeil zum Ziel am Rand
   c.setTransform(Z.dpr, 0, 0, Z.dpr, 0, 0);
@@ -518,8 +575,8 @@ function zeichne(c, t) {
     if (hx < 20 || hx > Z.w - 20 || hy < 20 || hy > Z.h - 20) {
       const ax = clamp(hx, 40, Z.w - 40), ay = clamp(hy, 40, Z.h - 40), a = Math.atan2(hy - ay, hx - ax), b = Z.ruhig ? 0 : Math.sin(t * 6) * 5;
       Z.randPfeil = { x: ax, y: ay, id: nx >= 0 ? 'g' + nx : 'tor' };   // den Pfeil am Rand kann man antippen: Die Figur läuft zum Ziel
-      c.save(); c.translate(ax + Math.cos(a) * b, ay + Math.sin(a) * b); circ(c, 0, 0, 26); fs(c, '#0b1736', '#ffd23f', 4); emoji(c, nx >= 0 ? Z.G[nx].emoji : Z.tor.emoji, 0, 1, 24);
-      c.rotate(a); tri(c, 30, -11, 46, 0, 30, 11); fs(c, '#ffd23f', '#000', 3); c.restore();
+      c.save(); c.translate(ax + Math.cos(a) * b, ay + Math.sin(a) * b); circ(c, 0, 0, 26); fs(c, '#0b1736', F.ziel, 4); emoji(c, nx >= 0 ? Z.G[nx].emoji : Z.tor.emoji, 0, 1, 24);
+      c.rotate(a); tri(c, 30, -11, 46, 0, 30, 11); fs(c, F.ziel, '#000', 3); c.restore();
     }
   }
   for (const b of Z.blasen) zeichneBlase(c, b);
@@ -544,7 +601,7 @@ function zeichneBlase(c, b) {
 function neuStart() {
   Z.P = { x: Z.start.x, y: Z.start.y, blick: 1, winkel: -Math.PI / 2, geht: false, weg: null, tempo: GESCHW, ankunft: null, hop: 0 };
   if (!frei(Z.P.x, Z.P.y)) { const k = naheFrei(Z.P.x, Z.P.y); if (k >= 0) { Z.P.x = (k % Z.cols + 0.5) * ZELLE; Z.P.y = (Math.floor(k / Z.cols) + 0.5) * ZELLE; } }
-  Z.polly = { x: Z.P.x - 50, y: Z.P.y - 110, blick: 1 };
+  Z.polly = S.begleiterAmBoden ? { x: Z.P.x - 56, y: Z.P.y + 4, blick: 1, geht: false } : { x: Z.P.x - 50, y: Z.P.y - 110, blick: 1 };
   Z.blasen = []; Z.fx = []; Z.marker = null; Z.gewarnt = false; Z.jubel = -1; Z.neueMission = false;
   Z.letztesWort = ''; Z.ruhe = 0; Z.sagBald = null; Z.loeweNr = 0; Z.sig = ''; for (const o of Z.orte) o.gesagt = false;
   for (const f of Z.figs) if (f.runde) { f.x = f.runde[0].x; f.y = f.runde[0].y; f.ziel = 1 % f.runde.length; f.pause = 0; f.ruhe = 3; }
@@ -588,13 +645,16 @@ function amGehege(i) {
   Sfx.play('plopp');
   if (!API.oeffneRaum(i)) { g.wackel = 1; sage(Z.texte.gesperrt); }
 }
+// Zusatzraum (im Zoo: Raubtierhaus) ist nur Kulisse. Antippen: kleine Reaktion und ein Hinweis.
 function amLoewe() {
-  const r = Z.raub, liste = Array.isArray(Z.texte.loeweSchnarcht) ? Z.texte.loeweSchnarcht : [Z.texte.loeweSchnarcht];
-  r.wach = 2.4; r.wackel = 1; Sfx.play('schnarch');
-  blase(r.x + 40, r.y - 96, '🦁 ' + (liste[Z.loeweNr++ % liste.length] || ''), 2.8, 'loewe');
-  sage(Z.texte.loewe);
+  const r = Z.raub, roh = Z.texte.zusatzReaktion || Z.texte.loeweSchnarcht, liste = Array.isArray(roh) ? roh : [roh];
+  r.wach = 2.4; r.wackel = 1; Sfx.play(S.zusatzTon || 'tipp');
+  const text = liste[Z.loeweNr++ % liste.length] || '';
+  if (text) blase(r.x + 40, r.y - 96, r.emoji + ' ' + text, 2.8, 'loewe');
+  const hinweis = Z.texte.zusatz || Z.texte.loewe; if (hinweis) sage(hinweis);
 }
-function pollySagt(text, dauer) { if (!Z.hatPolly || !text) return; blase(Z.polly.x, Z.polly.y - 30, text, dauer || 3, 'polly'); ansage(text); }
+function pollyKopf() { return S.begleiterAmBoden ? Z.polly.y - 96 : Z.polly.y - 30; }
+function pollySagt(text, dauer) { if (!Z.hatPolly || !text) return; blase(Z.polly.x, pollyKopf(), text, dauer || 3, 'polly'); ansage(text); }
 function amTor() {
   const frisch = API.status(); if (frisch) Z.status = frisch;
   if (Z.status && Z.status.torBereit) { Sfx.play('plopp'); API.zeigeTor(); }
@@ -611,14 +671,14 @@ function beiFigur(f) {
     for (let i = 0; i < 8; i++) { try { w = API.zufallsWort(); } catch (e) { w = null; } if (!w || w.en !== Z.letztesWort) break; }   // möglichst nicht zweimal hintereinander dasselbe Wort
     if (w) Z.letztesWort = w.en;
     f.trickT = 1;
-    const text = w ? '🐾 ' + w.en + ' = ' + w.de : '🐾';
+    const wz = S.marke.wort, text = w ? wz + ' ' + w.en + ' = ' + w.de : wz;
     blase(f.x, f.y - 84, text, 3.5, f.id); if (w) ansage(f.name + ': ' + w.en + ' heißt ' + w.de);
-  } else if (f.art === 'waechter') blase(f.x, f.y - 100, '🔦 ' + wahl(Z.texte.waechter), 2.5, f.id);
+  } else if (f.art === 'waechter') blase(f.x, f.y - 100, S.marke.zeit + ' ' + wahl(Z.texte.waechter), 2.5, f.id);
 }
 function pollyTipp() {
   const nx = naechstes();
   if (nx >= 0) sage(fuelle(Z.texte.tipp, { name: Z.G[nx].schild })); else if (Z.status && Z.status.torBereit) sage(Z.texte.tippTor);
-  funken(Z.polly.x, Z.polly.y, 6, { sp: 120 }); Sfx.play('tipp');
+  funken(Z.polly.x, pollyKopf() + 30, 6, { sp: 120 }); Sfx.play('tipp');
 }
 function jubeln(i) {
   const g = Z.G[i]; Z.jubel = -1; if (!g) return;
@@ -662,7 +722,9 @@ function schritt(dt) {
   if (!Z.sichtbar) return;   // am Ziel hat sich ein Raum geöffnet → Karte ist schon ausgeblendet
   // Polly fliegt hinterher
   const po = Z.polly, jub = Z.pollyJubel > 0 ? Z.pollyJubel : 0; if (Z.pollyJubel > 0) Z.pollyJubel -= dt;
-  const zx = P.x - P.blick * 46 + (jub && !Z.ruhig ? Math.cos(Z.zeit * 9) * 40 : 0), zy = P.y - 112 + (Z.ruhig ? 0 : Math.sin(Z.zeit * 2.4) * 6) + (jub && !Z.ruhig ? Math.sin(Z.zeit * 9) * 26 : 0);
+  const boden = !!S.begleiterAmBoden;   // manche Begleitfiguren laufen mit (Käpt'n), andere fliegen oder schweben (Polly)
+  const zx = boden ? P.x - P.blick * 58 : P.x - P.blick * 46 + (jub && !Z.ruhig ? Math.cos(Z.zeit * 9) * 40 : 0), zy = boden ? P.y + 4 : P.y - 112 + (Z.ruhig ? 0 : Math.sin(Z.zeit * 2.4) * 6) + (jub && !Z.ruhig ? Math.sin(Z.zeit * 9) * 26 : 0);
+  po.geht = boden && dist(po.x, po.y, zx, zy) > 8; if (boden && jub) po.hop = 1; if (po.hop > 0) po.hop -= dt * 2.4;
   if (Math.abs(zx - po.x) > 6) po.blick = zx > po.x ? 1 : -1; else po.blick = P.blick;
   po.x = lerp(po.x, zx, Math.min(1, dt * 4)); po.y = lerp(po.y, zy, Math.min(1, dt * 4));
   // Nachtwächter dreht langsam seine Runde (bei „weniger Bewegung“ bleibt er stehen)
@@ -697,7 +759,7 @@ function schritt(dt) {
   for (const g of Z.G) if (g.wackel > 0) g.wackel -= dt * 2.2;
   if (Z.tor.wackel > 0) Z.tor.wackel -= dt * 2.2;
   if (Z.marker && (Z.marker.t -= dt) <= 0) Z.marker = null;
-  for (let i = Z.blasen.length - 1; i >= 0; i--) { const b = Z.blasen[i]; b.t -= dt; if (b.id === 'polly') { b.x = po.x; b.y = po.y - 30; } if (b.t <= 0) Z.blasen.splice(i, 1); }
+  for (let i = Z.blasen.length - 1; i >= 0; i--) { const b = Z.blasen[i]; b.t -= dt; if (b.id === 'polly') { b.x = po.x; b.y = pollyKopf(); } if (b.t <= 0) Z.blasen.splice(i, 1); }
   for (let i = Z.fx.length - 1; i >= 0; i--) { const q = Z.fx[i]; q.life -= dt; if (q.life <= 0) { Z.fx.splice(i, 1); continue; } q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; }
   kameraZu(Z.ruhig ? 1 : Math.min(1, dt * 5));
   Z.pollT -= dt; if (Z.pollT <= 0) { Z.pollT = 0.5; pruefeStatus(); }
@@ -725,7 +787,7 @@ function tipp(x, y) {
   for (const g of Z.G) if (x > g.rect.x0 - 12 && x < g.rect.x1 + 12 && y > g.rect.y0 - 80 && y < g.spot.y + 18) { Sfx.play('tipp'); geheZu('g' + g.nr); return; }
   const r = Z.raub.rect; if (x > r.x0 && x < r.x1 && y > r.y0 - 70 && y < r.y1 + 10) { Sfx.play('tipp'); geheZu('raub'); return; }
   const t = Z.tor; if ((Math.abs(x - t.x) < 100 && y > t.y - 140) || (Math.abs(x - Z.tafel.x) < Math.max(70, m) && Math.abs(y - Z.tafel.y + 40) < Math.max(50, m))) { Sfx.play('tipp'); geheZu('tor'); return; }
-  if (Z.hatPolly && dist(x, y, Z.polly.x, Z.polly.y) < Math.max(36, m)) { pollyTipp(); return; }   // Polly zuletzt, damit sie keine Tür verdeckt
+  if (Z.hatPolly && dist(x, y, Z.polly.x, S.begleiterAmBoden ? Z.polly.y - 40 : Z.polly.y) < Math.max(36, m)) { pollyTipp(); return; }   // Polly zuletzt, damit sie keine Tür verdeckt
   laufZu(x, y);
 }
 function regelOffen() { return !!regelBox && !regelBox.hidden; }
@@ -786,8 +848,8 @@ function aktualisiereListe() {
   }
   const bereit = !!(Z.status && Z.status.torBereit);
   eintraege.push({ id: 'tor', text: Z.tor.name + ', ' + (bereit ? 'bereit: Zahlenschloss öffnen' : 'noch gesperrt') + '. Code bisher: ' + codeZeichen().map(z => z === '_' ? 'offen' : z === '?' ? 'unsicher' : z).join(', ') });
-  for (const f of Z.figs) if (f.art === 'waerterin') eintraege.push({ id: f.id, text: f.name + ': Regelkarte zeigen' }); else if (f.art === 'tier') eintraege.push({ id: f.id, text: f.name + ': ein englisches Wort hören' });
-  eintraege.push({ id: 'raub', text: Z.raub.name + ': Der Löwe schläft' });
+  for (const f of Z.figs) if (f.art === 'waerterin') eintraege.push({ id: f.id, text: f.name + ': Regelkarte zeigen' }); else if (f.art === 'tier') eintraege.push({ id: f.id, text: f.name + ': ein englisches Wort zeigen' });
+  eintraege.push({ id: 'raub', text: Z.raub.name + ': ' + (Z.texte.zusatzKurz || 'kommt nach jedem Raum von selbst') });
   const knoepfe = srListe.querySelectorAll('button');
   if (knoepfe.length !== eintraege.length) {
     srListe.textContent = '';
@@ -808,6 +870,7 @@ function zeigeRegel(nr) {
 function zeigeKarte(titel, text) {
   regelBox.querySelector('.zk-regel-titel').textContent = titel;
   regelBox.querySelector('.zk-regel-text').textContent = text;
+  const zuKnopf = regelBox.querySelector('.zk-zu'); if (zuKnopf) zuKnopf.textContent = Z.texte.schliessen || 'Schließen';
   regelBox.hidden = false; Z.tasten.clear();
   try { regelBox.querySelector('button').focus({ preventScroll: true }); } catch (e) {}
 }
@@ -836,7 +899,7 @@ function baueDom() {
   srLive = document.createElement('div'); srLive.className = 'zk-sr'; srLive.setAttribute('role', 'status'); srLive.setAttribute('aria-live', 'polite');
   regelBox = document.createElement('div'); regelBox.className = 'zk-regel'; regelBox.hidden = true; regelBox.setAttribute('role', 'dialog'); regelBox.setAttribute('aria-label', 'Kärtchen');
   const h = document.createElement('h3'); h.className = 'zk-regel-titel'; const p = document.createElement('p'); p.className = 'zk-regel-text';
-  const zu = document.createElement('button'); zu.type = 'button'; zu.textContent = 'Schließen'; hoere(zu, 'click', schliesseRegel);
+  const zu = document.createElement('button'); zu.type = 'button'; zu.className = 'zk-zu'; zu.textContent = 'Schließen'; hoere(zu, 'click', schliesseRegel);
   regelBox.append(h, p, zu);
   box.append(canvas, srListe, srLive, regelBox);
   const ueb = document.getElementById('uebersicht'), main = document.querySelector('main');
@@ -863,10 +926,13 @@ function groesse() {
 
 function zeigen(status) {
   const welt = API.welt();
-  if (!welt || !welt.karte || !Array.isArray(welt.raeume)) { angemeldet = false; throw new Error('Zoo-Karte: Für diese Klasse gibt es keine Kartendaten (welt.karte).'); }
+  if (!welt || !welt.karte || !Array.isArray(welt.raeume)) { angemeldet = false; throw new Error('Karte: Für diese Klasse gibt es keine Kartendaten (welt.karte).'); }
   baueDom();
-  const schluessel = welt.klasse + '|' + welt.name;
-  if (Z.gebaut !== schluessel) { baue(welt); Z.neueMission = true; srListe.textContent = ''; }
+  const name = stilName(welt.karte), da = !!(name && window.KartenStile[name]);
+  const schluessel = welt.klasse + '|' + welt.name + '|' + (da ? name : '');
+  if (Z.gebaut !== schluessel) { baue(welt); Z.gebaut = schluessel; Z.neueMission = true; srListe.textContent = ''; }
+  // Ist die Stil-Datei noch unterwegs, gibt es bis dahin das neutrale Aussehen. Danach wird neu gezeichnet.
+  if (name && !da && !stilFehlt[name]) ladeStil(name, ok => { if (ok && Z.sichtbar) zeigen(API.status()); });
   Z.status = status || API.status(); Z.sig = '';
   box.hidden = false; Z.sichtbar = true; groesse();
   if (Z.neueMission || !Z.P) neuStart();
@@ -883,26 +949,26 @@ function verbergen() {
   Z.tasten.clear(); Z.zeiger = null; Z.fokus = null; if (Z.P) { Z.P.weg = null; Z.P.ankunft = null; Z.P.geht = false; }
 }
 const KARTE = { zeigen, verbergen };
+// Anmelden bei der App. Vorher wird die Stil-Datei der gewählten Welt geholt (fehlt sie: neutrales Aussehen).
 function anmelden() {
-  if (angemeldet) return;
   let welt = null; try { welt = API.welt(); } catch (e) {}
   if (!welt || !welt.karte) return;
-  angemeldet = true;
-  if (!API.karteAnmelden(KARTE)) angemeldet = false;
+  ladeStil(stilName(welt.karte), () => { if (angemeldet) return; angemeldet = true; if (!API.karteAnmelden(KARTE)) angemeldet = false; });
 }
 
 API.on('bildschirm', sicher(e => {
-  if (e && (e.id === 'intro' || e.id === 'setup')) Z.neueMission = true;   // neue Mission: Figur startet wieder am Tor
-  if (angemeldet) return;
-  if (e && e.id === 'uebersicht') setTimeout(sicher(anmelden), 0); else anmelden();
+  if (e && (e.id === 'intro' || e.id === 'setup')) Z.neueMission = true;   // neue Mission: Figur startet wieder am Ausgang
+  if (e && e.id === 'uebersicht' && !angemeldet) setTimeout(sicher(anmelden), 0); else anmelden();   // holt bei Bedarf auch den Stil einer neu gewählten Welt
 }));
 API.on('zurueck', sicher(e => { Z.zurueck = !!(e && e.von === 'raum'); }));
 API.on('ziffer', sicher(e => { if (e && typeof e.raum === 'number') Z.jubel = e.raum; }));
 sicher(anmelden)();
 
 // Nur zum Nachschauen in der Konsole (Entwicklerwerkzeuge). Ändert nichts am Spiel.
-window.ZooKarte = Object.freeze({
+const DEBUG = Object.freeze({
   version: VERSION,
+  stil: () => S ? S.name : null,
+  stile: () => Object.keys(window.KartenStile || {}),
   speichert: 'nichts',
   sichtbar: () => Z.sichtbar,
   laeuft: () => !!Z.raf,
@@ -912,4 +978,5 @@ window.ZooKarte = Object.freeze({
   randPfeil: () => { if (!Z.randPfeil || !canvas) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + Z.randPfeil.x, y: r.top + Z.randPfeil.y, id: Z.randPfeil.id }; },
   bildschirmPunkt: id => { const z = zielVon(id); if (!z || !canvas) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (z.schau.x - Z.cam.x) * Z.scale, y: r.top + (z.schau.y - 30 - Z.cam.y) * Z.scale }; }
 });
+window.ZooKarte = DEBUG; window.WeltKarte = DEBUG;   // zwei Namen für dasselbe (ZooKarte = alter Name)
 })();
