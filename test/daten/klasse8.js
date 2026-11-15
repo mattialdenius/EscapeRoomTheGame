@@ -43,6 +43,82 @@ K8.welt = {
   }
 };
 
+// ---------- KARTE (Entdecker-Modus) ----------
+// Die Karte ersetzt die Übersicht mit den Kacheln (Datei welt/karte.js, Aussehen: welt/stil-detektiv.js).
+// So lest ihr die Zahlen: x = wie weit nach rechts (0 … 1600), y = wie weit nach unten (0 … 1000).
+// Ein Raum braucht etwa 300 × 200 Platz. Der Punkt x/y ist die Mitte, die Tür ist unten in der Mitte.
+// Kleine Schritte ändern (z. B. 50) und danach im Browser ansehen: …/test/index.html?welt=8
+K8.welt.karte = {
+  stil: "detektiv",                        // Aussehen: Datei welt/stil-detektiv.js
+  groesse: { b: 1600, h: 1000 },           // Größe der ganzen Karte. Klein lassen: kurze Wege!
+  start:   { x: 800, y: 850 },             // hier steht die Spielfigur am Anfang (vor dem Tresor)
+
+  // Die vier Räume. Reihenfolge = Reihenfolge der Räume oben (Archive zuerst).
+  raeume: [
+    { x: 290,  y: 310, schild: "Archive" },
+    { x: 1310, y: 310, schild: "Crime Lab" },
+    { x: 410,  y: 700, schild: "Map Room" },
+    { x: 1190, y: 700, schild: "Rooftop" }
+  ],
+  zusatzraum: { x: 800, y: 215, schild: "Interview Room" },   // nur Kulisse, wird nach jedem Raum von selbst betreten
+  tor:        { x: 800, y: 950 },                             // der Tresor unten
+
+  // Figuren: höchstens 5. Keine hält auf, Antippen ist freiwillig.
+  //   art: "begleiter" = Inspector Morgan, läuft hinterher
+  //   art: "regel"     = zeigt die Regelkarte des nächsten Raums
+  //   art: "zeit"      = dreht seine „runde“ (Punkte [x, y]) und warnt, wenn die Zeit knapp wird
+  //   art: "wort"      = zeigt ein Wort aus der Wörterhilfe („emoji“ = Bild, „trick“ = drehen, rollen oder huepfen)
+  figuren: [
+    { art: "begleiter" },
+    { art: "regel", name: "Desk sergeant", x: 660, y: 520 },
+    { art: "zeit",  name: "Night constable", runde: [[930, 470], [1150, 470], [1150, 560], [930, 560]] },
+    { art: "wort",  emoji: "🐈", name: "Office cat", trick: "rollen", x: 560,  y: 850 },
+    { art: "wort",  emoji: "☎️", name: "Telephone",  trick: "drehen", x: 1080, y: 865 }
+  ],
+
+  // Orte, an denen Inspector Morgan einmal pro Mission etwas sagt, wenn die Spielfigur in die Nähe kommt.
+  orte: [
+    { x: 800, y: 340, radius: 120, text: "The interview room. You'll be called in. Don't knock." },
+    { x: 150, y: 520, radius: 120, text: "Nothing here but dust. I checked. Twice." },
+    { x: 800, y: 620, radius: 100, text: "Mind the carpet. It's older than the Yard." }
+  ],
+
+  // Texte der Karte. {name} wird durch den Namen des Raums ersetzt.
+  // Steht hier eine Liste [ "…", "…" ], wird jedes Mal ein Satz ausgewählt.
+  texte: {
+    gesperrt:        "Locked. Finish the room with the arrow first.",
+    schonGeschafft:  "You already have that digit. Next room.",
+    torZu:           "The safe stays shut. Four rooms first.",
+    zusatz:          "The interview room opens after each room. Patience.",
+    zusatzReaktion:  ["Muffled voices.", "Someone coughs.", "A chair scrapes."],
+    jubel:           "A new digit. Noted.",
+    tipp:            "Next: {name}. Follow the arrow.",
+    tippTor:         "All four digits. To the safe.",
+    regelTitel:      "Case notes: {name}",
+    keineRegel:      "No case notes for this room.",
+    waerterinFertig: "All rooms done. The safe is over there.",
+    waechter:        "Hurry. The thief won't wait.",
+    waechterRuf:     ["Who's there? … Oh. Carry on.", "Evening. Working late?", "Thought I heard something."],
+    pollyGeschafft:  ["First digit. A start.", "Two digits. Halfway.", "One room left.", "All four. To the safe."],
+    pollyWarten:     ["Still thinking? Next: {name}.", "The clock is running. {name}."],
+    pollyZurueck:    ["Happens. Go back in.", "Take a moment. Then try again."],
+    schliessen:      "Close"
+  }
+};
+
+// Bild der Begleitfigur oben links (Inspector Morgan). Nur die Formen, ohne <svg>-Hülle, Feld 120 × 130.
+K8.welt.figurSvg =
+  '<path d="M16 130 Q16 98 60 94 Q104 98 104 130 Z" fill="#8a7a5c" stroke="#000" stroke-width="4"/>' +
+  '<path d="M40 96 L60 118 L80 96 L70 92 L60 104 L50 92 Z" fill="#a8977a" stroke="#000" stroke-width="3"/>' +
+  '<circle cx="60" cy="64" r="28" fill="#d9a77f" stroke="#000" stroke-width="4"/>' +
+  '<circle cx="50" cy="64" r="3.5" fill="#000"/><circle cx="70" cy="64" r="3.5" fill="#000"/>' +
+  '<path d="M44 76 Q52 70 60 76 Q68 70 76 76 Q68 82 60 78 Q52 82 44 76 Z" fill="#4a4033" stroke="#000" stroke-width="2.5"/>' +
+  '<path d="M42 56 L56 58 M64 58 L78 56" stroke="#000" stroke-width="3" stroke-linecap="round"/>' +
+  '<path d="M14 46 Q60 34 106 46 Q60 54 14 46 Z" fill="#4a4033" stroke="#000" stroke-width="4"/>' +
+  '<path d="M32 42 Q34 12 60 12 Q86 12 88 42 Z" fill="#4a4033" stroke="#000" stroke-width="4"/>' +
+  '<path d="M33 36 L87 36" stroke="#000" stroke-width="5"/>';
+// ---------- Ende KARTE ----------
+
 // 2) DIE THEMEN (laut „Themenuebersicht“, Red Line 4)
 K8.themen = [
   { id: "8-G1",  klasse: 8, unit: 1, titel: "Die einfache Vergangenheit", regel: "" },

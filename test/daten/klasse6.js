@@ -43,6 +43,82 @@ K6.welt = {
   }
 };
 
+// ---------- KARTE (Entdecker-Modus) ----------
+// Die Karte ersetzt die Übersicht mit den Kacheln (Datei welt/karte.js, Aussehen: welt/stil-schiff.js).
+// So lest ihr die Zahlen: x = wie weit nach rechts (0 … 1600), y = wie weit nach unten (0 … 1000).
+// Ein Raum braucht etwa 300 × 200 Platz. Der Punkt x/y ist die Mitte, die Tür ist unten in der Mitte.
+// Kleine Schritte ändern (z. B. 50) und danach im Browser ansehen: …/test/index.html?welt=6
+K6.welt.karte = {
+  stil: "schiff",                          // Aussehen: Datei welt/stil-schiff.js
+  groesse: { b: 1600, h: 1000 },           // Größe der ganzen Karte. Klein lassen: kurze Wege!
+  start:   { x: 800, y: 850 },             // hier steht die Spielfigur am Anfang (vor dem Beiboot)
+
+  // Die vier Räume. Reihenfolge = Reihenfolge der Räume oben (Kombüse zuerst).
+  raeume: [
+    { x: 330,  y: 300, schild: "Kombüse" },
+    { x: 1270, y: 300, schild: "Kapitänskajüte" },
+    { x: 330,  y: 690, schild: "Laderaum" },
+    { x: 1270, y: 690, schild: "Ausguck" }
+  ],
+  zusatzraum: { x: 800, y: 205, schild: "Pulverkammer" },   // nur Kulisse, wird nach jedem Raum von selbst betreten
+  tor:        { x: 800, y: 950 },                           // das Beiboot unten an der Reling
+
+  // Figuren: höchstens 5. Keine hält auf, Antippen ist freiwillig.
+  //   art: "begleiter" = Käpt'n Grammar, läuft hinterher
+  //   art: "regel"     = zeigt die Regelkarte des nächsten Raums
+  //   art: "zeit"      = dreht seine „runde“ (Punkte [x, y]) und warnt, wenn die Zeit knapp wird
+  //   art: "wort"      = zeigt ein Wort aus der Wörterhilfe („emoji“ = Bild, „trick“ = drehen, rollen oder huepfen)
+  figuren: [
+    { art: "begleiter" },
+    { art: "regel", name: "Schiffskoch", x: 690, y: 480 },
+    { art: "zeit",  name: "Wache", runde: [[890, 460], [1100, 460], [1100, 660], [890, 660]] },
+    { art: "wort",  emoji: "🦀", name: "Krabbe", trick: "rollen", x: 540,  y: 850 },
+    { art: "wort",  emoji: "🐙", name: "Krake",  trick: "drehen", x: 1080, y: 865 }
+  ],
+
+  // Orte, an denen der Käpt'n einmal pro Mission etwas sagt, wenn die Spielfigur in die Nähe kommt.
+  orte: [
+    { x: 600, y: 600, radius: 100, text: "Das ist der Großmast. Hochklettern nur mit Erlaubnis vom Käpt'n. Also von mir!" },
+    { x: 800, y: 330, radius: 120, text: "Finger weg von der Pulverkammer! Die kommt nach jedem Raum von ganz allein." },
+    { x: 160, y: 520, radius: 120, text: "Backbord ist links, Steuerbord ist rechts. Merkt euch das, ihr Landratten!" }
+  ],
+
+  // Texte der Karte. {name} wird durch den Namen des Raums ersetzt.
+  // Steht hier eine Liste [ "…", "…" ], wird jedes Mal ein Satz ausgewählt.
+  texte: {
+    gesperrt:        "Arrr, die Tür ist noch verriegelt! Schafft zuerst den Raum mit dem Pfeil.",
+    schonGeschafft:  "Hier habt ihr die Ziffer schon erbeutet. Weiter, Matrosen!",
+    torZu:           "Das Beiboot bleibt angekettet. Erst alle vier Räume schaffen!",
+    zusatz:          "Die Pulverkammer! Da geht es nach jedem Raum von selbst hinein.",
+    zusatzReaktion:  ["Zisch …", "Pssst … die Lunte!", "Zisch … knister …"],
+    jubel:           "Arrr! Eine neue Ziffer!",
+    tipp:            "Als Nächstes: {name}! Folgt dem gelben Pfeil.",
+    tippTor:         "Alle Ziffern an Bord! Ab zum Beiboot.",
+    regelTitel:      "Spickzettel für: {name}",
+    keineRegel:      "Für diesen Raum habe ich keinen Spickzettel.",
+    waerterinFertig: "Alles geschafft! Jetzt schnell zum Beiboot.",
+    waechter:        "Beeilt euch, die Crew kommt bald zurück!",
+    waechterRuf:     ["Wer schleicht da übers Deck?", "Halt! … Ach, ihr seid das.", "Hab ich da was gehört?"],
+    pollyGeschafft:  ["Arrr! Die erste Ziffer!", "Halbe Fahrt! Zwei Ziffern!", "Nur noch ein Raum, Matrosen!", "Alle vier! Ab zum Beiboot!"],
+    pollyWarten:     ["Nicht einschlafen, Landratten! Weiter: {name}!", "Der Wind steht gut. Auf zu: {name}!"],
+    pollyZurueck:    ["Kein Grund zur Meuterei. Gleich noch einmal!", "Kurz durchatmen, dann wieder rein!"]
+  }
+};
+
+// Bild der Begleitfigur oben links (Käpt'n Grammar). Nur die Formen, ohne <svg>-Hülle, Feld 120 × 130.
+K6.welt.figurSvg =
+  '<path d="M18 130 Q18 98 60 94 Q102 98 102 130 Z" fill="#7b1e2b" stroke="#000" stroke-width="4"/>' +
+  '<path d="M50 96 L60 112 L70 96 Z" fill="#f4ead2" stroke="#000" stroke-width="3"/>' +
+  '<circle cx="60" cy="62" r="29" fill="#d9a77f" stroke="#000" stroke-width="4"/>' +
+  '<path d="M34 70 Q36 100 60 102 Q84 100 86 70 Q74 82 60 82 Q46 82 34 70 Z" fill="#5a3a22" stroke="#000" stroke-width="4"/>' +
+  '<path d="M50 80 Q60 88 70 80" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>' +
+  '<circle cx="72" cy="60" r="4" fill="#000"/>' +
+  '<path d="M32 50 L88 62" stroke="#000" stroke-width="4"/><ellipse cx="49" cy="60" rx="9" ry="7" fill="#000"/>' +
+  '<path d="M10 46 Q60 -6 110 46 Q60 30 10 46 Z" fill="#1b1b22" stroke="#000" stroke-width="4"/>' +
+  '<path d="M26 40 Q60 22 94 40" fill="none" stroke="#ffd23f" stroke-width="4"/>' +
+  '<circle cx="60" cy="24" r="6" fill="#f4ead2" stroke="#000" stroke-width="2.5"/>';
+// ---------- Ende KARTE ----------
+
 // 2) DIE THEMEN (laut „Themenuebersicht“, Red Line 2)
 K6.themen = [
   { id: "6-G1",  klasse: 6, unit: 1, titel: "Adjektive und Adverbien", regel: "" },

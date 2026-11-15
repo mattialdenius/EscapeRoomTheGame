@@ -43,6 +43,82 @@ K7.welt = {
   }
 };
 
+// ---------- KARTE (Entdecker-Modus) ----------
+// Die Karte ersetzt die Übersicht mit den Kacheln (Datei welt/karte.js, Aussehen: welt/stil-museum.js).
+// So lest ihr die Zahlen: x = wie weit nach rechts (0 … 1600), y = wie weit nach unten (0 … 1000).
+// Ein Saal braucht etwa 300 × 200 Platz. Der Punkt x/y ist die Mitte, der Eingang ist unten in der Mitte.
+// Kleine Schritte ändern (z. B. 50) und danach im Browser ansehen: …/test/index.html?welt=7
+K7.welt.karte = {
+  stil: "museum",                          // Aussehen: Datei welt/stil-museum.js
+  groesse: { b: 1600, h: 1000 },           // Größe der ganzen Karte. Klein lassen: kurze Wege!
+  start:   { x: 800, y: 850 },             // hier steht die Spielfigur am Anfang (vor der Zeitmaschine)
+
+  // Die vier Säle. Reihenfolge = Reihenfolge der Räume oben (Saurier-Saal zuerst).
+  raeume: [
+    { x: 300,  y: 310, schild: "Saurier-Saal" },
+    { x: 1300, y: 310, schild: "Ägypten-Saal" },
+    { x: 300,  y: 700, schild: "Ritter-Saal" },
+    { x: 1300, y: 700, schild: "Zukunfts-Labor" }
+  ],
+  zusatzraum: { x: 800, y: 215, schild: "Zeitstrudel" },   // nur Kulisse, wird nach jedem Saal von selbst betreten
+  tor:        { x: 800, y: 950 },                          // die Zeitmaschine unten
+
+  // Figuren: höchstens 5. Keine hält auf, Antippen ist freiwillig.
+  //   art: "begleiter" = Professorin Tempora (über Funk): eine fliegende Taschenuhr
+  //   art: "regel"     = zeigt die Regelkarte des nächsten Saals
+  //   art: "zeit"      = dreht seine „runde“ (Punkte [x, y]) und warnt, wenn die Zeit knapp wird
+  //   art: "wort"      = zeigt ein Wort aus der Wörterhilfe („emoji“ = Bild, „trick“ = drehen, rollen oder huepfen)
+  figuren: [
+    { art: "begleiter" },
+    { art: "regel", name: "Roboter-Guide", x: 670, y: 520 },
+    { art: "zeit",  name: "Museumswärter", runde: [[930, 470], [1120, 470], [1120, 640], [930, 640]] },
+    { art: "wort",  emoji: "🏺", name: "Sprechende Vase", trick: "drehen",  x: 540,  y: 850 },
+    { art: "wort",  emoji: "🦕", name: "Saurier-Modell",  trick: "huepfen", x: 1080, y: 865 }
+  ],
+
+  // Orte, an denen Professorin Tempora einmal pro Mission etwas sagt, wenn die Spielfigur in die Nähe kommt.
+  orte: [
+    { x: 800, y: 340, radius: 120, text: "Der Zeitstrudel. Bitte nicht hineinfassen. Er meldet sich früh genug." },
+    { x: 150, y: 520, radius: 120, text: "Hier hinten ist nur der Notausgang. Leider auch verriegelt." },
+    { x: 800, y: 620, radius: 100, text: "Der rote Läufer führt zu allen Sälen. Praktisch, oder?" }
+  ],
+
+  // Texte der Karte. {name} wird durch den Namen des Saals ersetzt.
+  // Steht hier eine Liste [ "…", "…" ], wird jedes Mal ein Satz ausgewählt.
+  texte: {
+    gesperrt:        "Dieser Saal ist noch verriegelt. Schafft zuerst den Saal mit dem Pfeil.",
+    schonGeschafft:  "Diese Ziffer habt ihr schon. Weiter zum nächsten Saal.",
+    torZu:           "Die Zeitmaschine startet erst, wenn alle vier Säle geschafft sind.",
+    zusatz:          "Der Zeitstrudel öffnet sich nach jedem Saal von selbst.",
+    zusatzReaktion:  ["Wusch …", "Die Zeiger drehen sich.", "Tick … tack … tick …"],
+    jubel:           "Eine neue Ziffer. Sehr gut.",
+    tipp:            "Als Nächstes: {name}. Folgt dem Pfeil.",
+    tippTor:         "Alle Ziffern gefunden. Auf zur Zeitmaschine.",
+    regelTitel:      "Infotafel: {name}",
+    keineRegel:      "Zu diesem Saal habe ich keine Infotafel gespeichert.",
+    waerterinFertig: "Alle Säle geschafft. Die Zeitmaschine wartet.",
+    waechter:        "Das Museum öffnet bald. Beeilt euch.",
+    waechterRuf:     ["Ist da jemand?", "Nanu, Besuch um diese Zeit?", "Hm. Wohl nur die Lüftung."],
+    pollyGeschafft:  ["Die erste Ziffer. Guter Anfang.", "Zwei von vier. Halbzeit.", "Nur noch ein Saal.", "Alle vier. Auf zur Zeitmaschine!"],
+    pollyWarten:     ["Die Zeit läuft. Weiter: {name}.", "Seid ihr noch da? Als Nächstes: {name}."],
+    pollyZurueck:    ["Kein Problem. Gleich noch einmal.", "Kurz sammeln, dann wieder hinein."]
+  }
+};
+
+// Bild der Begleitfigur oben links (Professorin Tempora). Nur die Formen, ohne <svg>-Hülle, Feld 120 × 130.
+K7.welt.figurSvg =
+  '<path d="M18 130 Q18 98 60 94 Q102 98 102 130 Z" fill="#f4f4f6" stroke="#000" stroke-width="4"/>' +
+  '<path d="M48 96 L60 116 L72 96 Z" fill="#7a1f2b" stroke="#000" stroke-width="3"/>' +
+  '<circle cx="60" cy="26" r="13" fill="#b9bfc9" stroke="#000" stroke-width="4"/>' +
+  '<circle cx="60" cy="62" r="29" fill="#e8b98f" stroke="#000" stroke-width="4"/>' +
+  '<path d="M31 62 Q30 32 60 32 Q90 32 89 62 Q80 44 60 44 Q40 44 31 62 Z" fill="#b9bfc9" stroke="#000" stroke-width="4"/>' +
+  '<circle cx="48" cy="64" r="10" fill="#fff" fill-opacity="0.5" stroke="#000" stroke-width="3"/><circle cx="72" cy="64" r="10" fill="#fff" fill-opacity="0.5" stroke="#000" stroke-width="3"/>' +
+  '<path d="M58 64 L62 64" stroke="#000" stroke-width="3"/>' +
+  '<circle cx="48" cy="64" r="3" fill="#000"/><circle cx="72" cy="64" r="3" fill="#000"/>' +
+  '<path d="M52 80 Q60 85 68 80" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>' +
+  '<circle cx="88" cy="112" r="10" fill="#d9b45a" stroke="#000" stroke-width="3"/><path d="M88 112 L88 106 M88 112 L92 114" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>';
+// ---------- Ende KARTE ----------
+
 // 2) DIE THEMEN (laut „Themenuebersicht“, Red Line 3)
 K7.themen = [
   { id: "7-G1",  klasse: 7, unit: 1, titel: "Die einfache Gegenwart", regel: "" },
